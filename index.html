@@ -970,7 +970,7 @@ function renderShoppingItem(item) {
   const invItem = item.inventoryItemId ? state.inventoryList.find(i => i.id === item.inventoryItemId) : null;
   return `
     <div class="shopping-item bg-surface-container-lowest rounded-2xl px-4 py-3 border border-outline-variant flex items-center gap-3 ${item.isCompleted ? 'opacity-60' : ''}">
-      <input type="checkbox" class="custom-checkbox" ${item.isCompleted ? 'checked' : ''}
+      <input type="checkbox" class="custom-checkbox" data-shop-id="${item.id}" ${item.isCompleted ? 'checked' : ''} ${pendingShoppingIds.has(item.id) ? 'disabled' : ''}
         onchange="toggleShoppingItem('${item.id}', this.checked)">
       <div class="flex-1 min-w-0">
         <div class="flex items-center gap-2">
@@ -1022,51 +1022,151 @@ function shopQuickAdd() {
   showToast(`${name} נוסף לרשימה!`, 'shopping_cart');
 }
 
+// ============================================================
+// INVENTORY: ADD OR MERGE (the only path that adds stock to inventory)
+// ============================================================
+// Normalized name: no surrounding spaces, and multiple spaces collapsed into one
+function normalizeProductName(name) {
+  return String(name ?? '').trim().replace(/\s+/g, ' ');
+}
+// Comparison key: normalized name, case-insensitive
+function productKey(name) {
+  return normalizeProductName(name).toLowerCase();
+}
+// Safe quantity: a positive number, a number at the start of text ("3 מארזים" → 3), or 1 by default. Never NaN
+function parseQuantity(value) {
+  if (typeof value === 'number') return Number.isFinite(value) && value > 0 ? Math.round(value) : 1;
+  const m = String(value ?? '').trim().match(/^\d+(?:[.,]\d+)?/);
+  const n = m ? Math.round(parseFloat(m[0].replace(',', '.'))) : NaN;
+  return Number.isFinite(n) && n > 0 ? n : 1;
+}
+
+// Finds an existing product: by an explicitly selected id, by name in local state, then by name on the server
+async function findExistingInventoryItem(name, existingItemId) {
+  if (existingItemId) {
+    const byId = state.inventoryList.find(i => i.id === existingItemId);
+    if (byId) return byId;
+  }
+  const key = productKey(name);
+  const local = state.inventoryList.find(i => productKey(i.name) === key);
+  if (local) return local;
+
+  // Server check: a product another family member just added and hasn't reached this device yet.
+  // ilike without wildcards = case-insensitive comparison; % and _ are escaped so they're matched literally
+  const pattern = normalizeProductName(name).replace(/[\\%_]/g, c => '\\' + c);
+  const { data, error } = await sb.from('inventory_items').select('*')
+    .eq('household_id', state.household.id).ilike('name', pattern).limit(1);
+  if (error) { console.error('[inventory] lookup failed:', error); return null; }
+  if (data && data[0]) {
+    const item = rowToInventory(data[0]);
+    state.inventoryList.unshift(item);
+    return item;
+  }
+  return null;
+}
+
+// Requests are queued one after another: two quick taps (or "סמן הכל") never create the same product twice
+let inventoryQueue = Promise.resolve();
+function addOrMergeInventoryItem(opts) {
+  const run = inventoryQueue.then(() => doAddOrMergeInventoryItem(opts));
+  inventoryQueue = run.catch(() => {});
+  return run;
+}
+
+// Returns { item, merged } on success, or null on failure (after showing an error)
+async function doAddOrMergeInventoryItem({
+  name, quantityToAdd, status = 'מלא', category = 'כללי',
+  updatedBy = state.memberId, existingItemId = null, sourceShoppingItemId = null, _retried = false,
+}) {
+  const cleanName = normalizeProductName(name);
+  if (!cleanName || !state.household) return null;
+  const qty = parseQuantity(quantityToAdd);
+  const existing = await findExistingInventoryItem(cleanName, existingItemId);
+
+  if (existing) {
+    const before = { ...existing };
+    const newQuantity = (Number(existing.quantity) || 0) + qty;
+    // last_updated is updated automatically by a trigger in the database
+    const { error } = await sb.from('inventory_items')
+      .update({ quantity: newQuantity, status, updated_by: updatedBy })
+      .eq('id', existing.id);
+    if (error) {
+      console.error('[inventory] update failed:', error);
+      showToast('שגיאה בעדכון המלאי', 'error');
+      await loadHouseholdData();
+      return null;
+    }
+    Object.assign(existing, { quantity: newQuantity, status, lastUpdated: new Date().toISOString() });
+    dbLogHistory(existing.id, 'restocked', before, existing, sourceShoppingItemId);
+    showToast(`עודכן במלאי: ${existing.name} (סה״כ: ${newQuantity})`, 'inventory');
+    return { item: existing, merged: true };
+  }
+
+  const newItem = {
+    id: genId(), name: cleanName, quantity: qty, status, category,
+    notes: '', lastUpdated: new Date().toISOString(),
+  };
+  const row = inventoryToRow(newItem);
+  row.created_by = updatedBy;
+  row.updated_by = updatedBy;
+  const { error } = await sb.from('inventory_items').insert(row);
+  if (error) {
+    // 23505 = the unique constraint on (household_id, name): a product with this exact name was added at the same moment
+    // (e.g. by another family member) → reload and merge into it instead of creating a duplicate
+    if (error.code === '23505' && !_retried) {
+      await loadHouseholdData();
+      return doAddOrMergeInventoryItem({ name, quantityToAdd, status, category, updatedBy, existingItemId, sourceShoppingItemId, _retried: true });
+    }
+    console.error('[inventory] insert failed:', error);
+    showToast('שגיאה בהוספה למלאי', 'error');
+    await loadHouseholdData();
+    return null;
+  }
+  state.inventoryList.unshift(newItem);
+  dbLogHistory(newItem.id, 'created', null, newItem, sourceShoppingItemId);
+  showToast(`נוסף למלאי: ${cleanName} (${qty})`, 'add_circle');
+  return { item: newItem, merged: false };
+}
+
+// Items whose request is in flight: a second tap on the same checkbox is ignored
+const pendingShoppingIds = new Set();
+
 async function toggleShoppingItem(id, checked) {
   const item = state.shoppingList.find(s => s.id === id);
-  if (!item) return;
-  item.isCompleted = checked;
+  if (!item || pendingShoppingIds.has(id)) return;
 
   if (!checked) {
+    item.isCompleted = false;
     dbSaveShopping(item);
     setTimeout(() => renderActiveTab(), 300);
     return;
   }
 
-  // Find the matching inventory item: by link, otherwise by name
-  const normName = s => (s || '').trim().toLowerCase();
-  let invItem = state.inventoryList.find(i => i.id === item.inventoryItemId)
-    || state.inventoryList.find(i => normName(i.name) === normName(item.name));
-
-  if (invItem) {
-    const before = { ...invItem };
-    invItem.quantity += item.requestedQuantity;
-    invItem.status = statusFromQuantity(invItem.quantity);
-    invItem.lastUpdated = new Date().toISOString();
-    item.inventoryItemId = invItem.id;
-    dbSaveShopping(item);
-    dbSaveInventory(invItem).then(() => dbLogHistory(invItem.id, 'restocked', before, invItem, item.id));
-    showToast(`${invItem.name} עודכן במלאי!`, 'sync');
-  } else {
-    // The product isn't in inventory yet: create it in the "כללי" category (can be changed later from the edit screen)
-    invItem = {
-      id: genId(),
-      name: item.name.trim(),
-      quantity: item.requestedQuantity,
-      status: statusFromQuantity(item.requestedQuantity),
+  pendingShoppingIds.add(id);
+  item.isCompleted = true;
+  const cb = document.querySelector(`input[data-shop-id="${id}"]`);
+  if (cb) cb.disabled = true;
+  try {
+    // Purchased = full stock. Matched by link to the inventory item, otherwise by name
+    const result = await addOrMergeInventoryItem({
+      name: item.name,
+      quantityToAdd: item.requestedQuantity,
+      status: 'מלא',
       category: 'כללי',
-      notes: '',
-      lastUpdated: new Date().toISOString(),
-    };
-    state.inventoryList.unshift(invItem);
-    item.inventoryItemId = invItem.id;
-    // The inventory item has to exist in the database before the shopping item links to it
-    await dbSaveInventory(invItem, true);
-    dbSaveShopping(item);
-    dbLogHistory(invItem.id, 'created', null, invItem, item.id);
-    showToast(`${invItem.name} נוסף למלאי!`, 'add_circle');
+      updatedBy: state.memberId,
+      existingItemId: item.inventoryItemId,
+      sourceShoppingItemId: item.id,
+    });
+    if (!result) {
+      item.isCompleted = false; // failed: the item goes back to unchecked
+    } else {
+      item.inventoryItemId = result.item.id;
+      await dbSaveShopping(item);
+    }
+  } finally {
+    pendingShoppingIds.delete(id);
+    if (cb) cb.disabled = false;
   }
-
   setTimeout(() => renderActiveTab(), 300);
 }
 
@@ -1162,7 +1262,7 @@ function renderQuickAddDetails() {
         </div>
       </div>
 
-      <button onclick="submitQuickAdd()" class="w-full bg-primary text-white rounded-xl py-4 text-title-sm font-bold active:scale-95 transition-transform flex items-center justify-center gap-2">
+      <button onclick="submitQuickAdd()" id="qa-submit" class="disabled:opacity-60 w-full bg-primary text-white rounded-xl py-4 text-title-sm font-bold active:scale-95 transition-transform flex items-center justify-center gap-2">
         <span class="material-symbols-outlined">add_circle</span>
         עדכן כמות במלאי
       </button>
@@ -1209,7 +1309,7 @@ function renderQuickAddDetails() {
         </div>
       </div>
 
-      <button onclick="submitQuickAdd()" class="w-full bg-primary text-white rounded-xl py-4 text-title-sm font-bold active:scale-95 transition-transform flex items-center justify-center gap-2">
+      <button onclick="submitQuickAdd()" id="qa-submit" class="disabled:opacity-60 w-full bg-primary text-white rounded-xl py-4 text-title-sm font-bold active:scale-95 transition-transform flex items-center justify-center gap-2">
         <span class="material-symbols-outlined">add_circle</span>
         הוסף למלאי
       </button>
@@ -1314,52 +1414,40 @@ function qaStepQty(delta) {
   el.value = Math.max(1, (parseInt(el.value) || 1) + delta);
 }
 
-function submitQuickAdd() {
+let isSubmittingQuickAdd = false;
+
+async function submitQuickAdd() {
+  if (isSubmittingQuickAdd) return;
   const nameEl = document.getElementById('qa-name');
   const qtyEl = document.getElementById('qa-qty');
   if (!nameEl || !qtyEl) return;
-  const name = nameEl.value.trim();
-  const qty = parseInt(qtyEl.value) || 1;
+  const name = normalizeProductName(nameEl.value);
   if (!name) { nameEl.focus(); return; }
 
-  if (state.quickAddMode === 'existing' && state.quickAddSelectedItem) {
-    const item = state.inventoryList.find(i => i.id === state.quickAddSelectedItem.id);
-    if (item) {
-      const before = { ...item };
-      item.quantity += qty;
-      item.status = statusFromQuantity(item.quantity);
-      item.lastUpdated = new Date().toISOString();
-      dbSaveInventory(item).then(() => dbLogHistory(item.id, 'restocked', before, item));
-      showToast(`${item.name} עודכן! כמות: ${item.quantity}`, 'inventory');
-    }
-  } else {
-    const existing = state.inventoryList.find(i => i.name === name);
-    if (existing) {
-      const before = { ...existing };
-      existing.quantity += qty;
-      existing.lastUpdated = new Date().toISOString();
-      dbSaveInventory(existing).then(() => dbLogHistory(existing.id, 'restocked', before, existing));
-      showToast(`${name} עודכן במלאי!`, 'inventory');
-    } else {
-      const newItem = {
-        id: genId(),
-        name,
-        quantity: qty,
-        status: qaSelectedStatus,
-        category: qaSelectedCategory,
-        notes: '',
-        lastUpdated: new Date().toISOString(),
-      };
-      state.inventoryList.unshift(newItem);
-      dbSaveInventory(newItem, true).then(() => dbLogHistory(newItem.id, 'created', null, newItem));
-      showToast(`${name} נוסף למלאי!`, 'add_circle');
-    }
-  }
+  // A product selected from the suggestions: no status selection in this mode, so it's "מלא"
+  const existingItemId = state.quickAddMode === 'existing' && state.quickAddSelectedItem ? state.quickAddSelectedItem.id : null;
 
-  state.quickAddMode = 'new';
-  state.quickAddSelectedItem = null;
-  closeModal('quickAdd');
-  if (state.currentTab === 'inventory') renderActiveTab();
+  isSubmittingQuickAdd = true;
+  const btn = document.getElementById('qa-submit');
+  if (btn) btn.disabled = true;
+  try {
+    const result = await addOrMergeInventoryItem({
+      name,
+      quantityToAdd: qtyEl.value,
+      status: existingItemId ? 'מלא' : (qaSelectedStatus || 'מלא'),
+      category: qaSelectedCategory || 'כללי',
+      updatedBy: state.memberId,
+      existingItemId,
+    });
+    if (!result) return; // the error was already shown; the window stays open so you can try again
+    state.quickAddMode = 'new';
+    state.quickAddSelectedItem = null;
+    closeModal('quickAdd');
+    if (state.currentTab === 'inventory') renderActiveTab();
+  } finally {
+    isSubmittingQuickAdd = false;
+    if (btn) btn.disabled = false;
+  }
 }
 
 // ============================================================
