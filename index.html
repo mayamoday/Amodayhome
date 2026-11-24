@@ -93,9 +93,10 @@ tailwind.config = {
   input, select, textarea { min-width: 0; }
   /* Content area: room for the bottom nav bar + the safe area on iPhone */
   .main-safe { padding-bottom: calc(6rem + env(safe-area-inset-bottom)); }
-  /* Bottom sheets: limited to the screen height, scroll internally, padding above the iPhone home bar */
-  .sheet-scroll { max-height: 88vh; max-height: 88dvh; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
-  .sheet-scroll-sm { max-height: 60vh; max-height: 60dvh; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; }
+  /* Bottom sheets: limited to the screen height, scroll internally, padding above the iPhone home bar.
+     svh and not dvh: dvh changes when the keyboard opens and causes jumps while typing */
+  .sheet-scroll { max-height: 85vh; max-height: 85svh; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+  .sheet-scroll-sm { max-height: 60vh; max-height: 60svh; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; }
   .sheet-body { padding-bottom: calc(2rem + env(safe-area-inset-bottom)); }
   /* Horizontal filter rows: scroll within themselves without widening the page */
   .chip-row { width: 100%; max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
@@ -502,7 +503,9 @@ function refreshUI() {
   if (!document.getElementById('main-content')) return;
   renderActiveTab();
   updateHeader();
-  if (state.openModals.includes('profile')) renderProfileModal();
+  const typingInProfile = document.getElementById('modal-profile')?.contains(document.activeElement)
+    && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
+  if (state.openModals.includes('profile') && !typingInProfile) renderProfileModal();
   enforceAccessGate();
 }
 
@@ -576,7 +579,7 @@ function showToast(msg, icon = 'check_circle') {
 // ============================================================
 function switchTab(tab) {
   state.currentTab = tab;
-  renderActiveTab();
+  renderActiveTab(true);
   updateNavBar();
 }
 
@@ -602,8 +605,16 @@ function updateNavBar() {
   });
 }
 
-function renderActiveTab() {
+// force=false: if the current screen is already shown, only #screen-body is updated (the list),
+// and the fields at the top of the screen aren't rebuilt, so the keyboard doesn't close while typing
+function renderActiveTab(force = false) {
   const main = document.getElementById('main-content');
+  const body = document.getElementById('screen-body');
+  if (!force && hasAccess() && body && main.dataset.tab === state.currentTab) {
+    body.innerHTML = state.currentTab === 'inventory' ? renderInventoryBody() : renderShoppingBody();
+    return;
+  }
+  main.dataset.tab = hasAccess() ? state.currentTab : '';
   if (!hasAccess()) {
     main.innerHTML = renderLockedScreen();
   } else if (state.currentTab === 'inventory') {
@@ -706,16 +717,19 @@ function renderModal(name) {
 // ============================================================
 // SCREEN 1: INVENTORY
 // ============================================================
-function renderInventoryScreen() {
+function filteredInventory() {
   const { search, status: statusFilter, category: catFilter } = state.inventoryFilter;
-
-  let items = state.inventoryList.filter(item => {
+  return state.inventoryList.filter(item => {
     const matchSearch = !search || item.name.includes(search);
     const matchStatus = statusFilter === 'הכל' || item.status === statusFilter;
     const matchCat = catFilter === 'הכל' || item.category === catFilter;
     return matchSearch && matchStatus && matchCat;
   });
+}
 
+// Fixed part of the screen (search + filters). Not rebuilt while typing, so the field keeps focus
+function renderInventoryScreen() {
+  const { search } = state.inventoryFilter;
   const statusChips = ['הכל', 'מלא', 'חצי', 'כמעט ריק'];
   const catChips = ['הכל', ...categoryNames()];
 
@@ -753,6 +767,14 @@ function renderInventoryScreen() {
       </div>
     </div>
 
+    <div id="screen-body">${renderInventoryBody()}</div>
+  `;
+}
+
+// The part that updates: count + list of items
+function renderInventoryBody() {
+  const items = filteredInventory();
+  return `
     <!-- Items Count -->
     <div class="px-4 pb-2 flex items-center justify-between">
       <span class="text-label-lg text-on-surface-variant">${items.length} פריטים</span>
@@ -829,7 +851,7 @@ function onInventorySearch(val) {
 
 function setInventoryFilter(key, val) {
   state.inventoryFilter[key] = val;
-  if (state.currentTab === 'inventory') renderActiveTab();
+  if (state.currentTab === 'inventory') renderActiveTab(true);
 }
 
 function reRenderInventoryList() {
@@ -884,10 +906,8 @@ function openEditFromCard(id) {
 // ============================================================
 // SCREEN 3: SHOPPING LIST
 // ============================================================
+// Fixed part of the screen (add form). Not rebuilt on sync, so the field keeps focus
 function renderShoppingScreen() {
-  const active = state.shoppingList.filter(s => !s.isCompleted);
-  const completed = state.shoppingList.filter(s => s.isCompleted);
-
   return `
     <!-- Quick Add Form -->
     <div class="px-4 pt-4 pb-3">
@@ -907,11 +927,19 @@ function renderShoppingScreen() {
       </div>
     </div>
 
+    <div id="screen-body">${renderShoppingBody()}</div>
+  `;
+}
+
+function renderShoppingBody() {
+  const active = state.shoppingList.filter(s => !s.isCompleted);
+  const completed = state.shoppingList.filter(s => s.isCompleted);
+  return `
     <!-- Active Items -->
     <div class="px-4 pb-2">
       <div class="flex items-center justify-between mb-2">
         <h3 class="text-title-sm font-bold text-on-surface">לקנות (${active.length})</h3>
-        ${active.length > 0 ? `<button onclick="clearCompleted()" class="text-label-md text-primary active:scale-95 transition-transform">סמן הכל</button>` : ''}
+        ${active.length > 0 ? `<button onclick="markAllPurchased()" class="text-label-md text-primary active:scale-95 transition-transform">סמן הכל</button>` : ''}
       </div>
       <div class="flex flex-col gap-2">
         ${active.length === 0 ? `
@@ -1050,6 +1078,13 @@ function removeShoppingItem(id) {
   if (item) showToast(`${item.name} הוסר`, 'delete');
 }
 
+// "סמן הכל": marks every item on the list as purchased (and updates the inventory, like a checkbox)
+async function markAllPurchased() {
+  const ids = state.shoppingList.filter(s => !s.isCompleted).map(s => s.id);
+  for (const id of ids) await toggleShoppingItem(id, true);
+  if (ids.length) showToast(`${ids.length} פריטים סומנו כנרכשו ועודכנו במלאי`, "done_all");
+}
+
 function clearCompleted() {
   const doneIds = state.shoppingList.filter(s => s.isCompleted).map(s => s.id);
   if (doneIds.length) dbDeleteShopping(doneIds);
@@ -1064,6 +1099,13 @@ function clearCompleted() {
 function renderQuickAddModal() {
   const content = document.getElementById('quick-add-content');
   content.innerHTML = renderQuickAddForm();
+  attachQuickAddListeners();
+}
+
+function updateQuickAddDetails() {
+  const el = document.getElementById('qa-details');
+  if (!el) return renderQuickAddModal();
+  el.innerHTML = renderQuickAddDetails();
   attachQuickAddListeners();
 }
 
@@ -1086,6 +1128,15 @@ function renderQuickAddForm() {
       </div>
     </div>
 
+    <div id="qa-details">${renderQuickAddDetails()}</div>
+  `;
+}
+
+// The part of the form below the name field: changes between "new item" and "existing item" without touching the name field
+function renderQuickAddDetails() {
+  const isExisting = state.quickAddMode === 'existing' && state.quickAddSelectedItem;
+  const item = state.quickAddSelectedItem;
+  return `
     ${isExisting ? `
       <!-- Existing Item Mode -->
       <div class="bg-primary/5 border border-primary/20 rounded-xl p-3 mb-4 flex items-center gap-3">
@@ -1189,8 +1240,7 @@ function onQANameInput(val) {
     if (state.quickAddMode === 'existing') {
       state.quickAddMode = 'new';
       state.quickAddSelectedItem = null;
-      renderQuickAddModal();
-      document.getElementById('qa-name').value = val;
+      updateQuickAddDetails();
     }
     return;
   }
@@ -1198,8 +1248,8 @@ function onQANameInput(val) {
   dd.innerHTML = matches.map(item => {
     const sc = statusConfig(item.status);
     return `
-      <button class="w-full flex items-center gap-3 px-4 py-3 hover:bg-surface-container text-right transition-colors"
-        onmousedown="selectAutocompleteItem('${item.id}')">
+      <button type="button" class="w-full flex items-center gap-3 px-4 py-3 hover:bg-surface-container text-right transition-colors"
+        onpointerdown="event.preventDefault()" onmousedown="event.preventDefault()" onclick="selectAutocompleteItem('${item.id}')">
         <span class="material-symbols-outlined text-on-surface-variant">${categoryIcon(item.category)}</span>
         <div class="flex-1 min-w-0">
           <div class="text-body-md font-medium text-on-surface">${escapeHtml(item.name)}</div>
@@ -1221,7 +1271,10 @@ function selectAutocompleteItem(id) {
   if (!item) return;
   state.quickAddMode = 'existing';
   state.quickAddSelectedItem = item;
-  renderQuickAddModal();
+  const nameEl = document.getElementById('qa-name');
+  if (nameEl) nameEl.value = item.name;
+  hideAutocomplete();
+  updateQuickAddDetails();
 }
 
 function selectQACategory(cat, toast = true) {
