@@ -7,6 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;900&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 tailwind.config = {
   darkMode: "class",
@@ -312,31 +313,25 @@ tailwind.config = {
 
 <script>
 // ============================================================
-// STATE
+// SUPABASE
 // ============================================================
+// The publishable key is public by design: Row Level Security in the database protects the data
+const SUPABASE_URL = 'https://npdpkyglgskyzfsrgerw.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_xjNsPfeHtuCMik1c-GAKGg_ndrYIi1n';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
 const state = {
   currentTab: 'inventory',
   openModals: [],
-  inventoryList: [
-    { id: 'i1', name: 'חלב 3%', quantity: 2, status: 'חצי', category: 'מקרר', lastUpdated: new Date().toISOString() },
-    { id: 'i2', name: 'גבינה צהובה', quantity: 1, status: 'כמעט ריק', category: 'מקרר', lastUpdated: new Date().toISOString() },
-    { id: 'i3', name: 'נייר טואלט', quantity: 6, status: 'מלא', category: 'חומרי ניקוי', lastUpdated: new Date().toISOString() },
-    { id: 'i4', name: 'תירס קפוא', quantity: 2, status: 'מלא', category: 'קפאון', lastUpdated: new Date().toISOString() },
-    { id: 'i5', name: 'ביצים', quantity: 12, status: 'מלא', category: 'מקרר', lastUpdated: new Date().toISOString() },
-    { id: 'i6', name: 'לחם', quantity: 1, status: 'חצי', category: 'מזווה', lastUpdated: new Date().toISOString() },
-    { id: 'i7', name: 'שמן זית', quantity: 1, status: 'כמעט ריק', category: 'מזווה', lastUpdated: new Date().toISOString() },
-  ],
-  shoppingList: [
-    { id: 's1', inventoryItemId: null, name: 'עגבניות', requestedQuantity: 3, note: 'רק צרור', addedBy: 'רוני', addedAt: new Date().toISOString(), isCompleted: false },
-    { id: 's2', inventoryItemId: 'i1', name: 'חלב פרימה', requestedQuantity: 2, note: 'מחלב מלא', addedBy: 'יואב', addedAt: new Date().toISOString(), isCompleted: false },
-    { id: 's3', inventoryItemId: null, name: 'פיתות', requestedQuantity: 2, note: '', addedBy: 'שרה', addedAt: new Date().toISOString(), isCompleted: true },
-  ],
-  currentUser: { id: 'u1', name: 'משפחת אמודאי', email: 'family@amoday.com', isLoggedIn: true },
-  familyMembers: [
-    { id: 'm1', name: 'יואב', role: 'אבא', avatar: 'י' },
-    { id: 'm2', name: 'רוני', role: 'אמא', avatar: 'ר' },
-    { id: 'm3', name: 'שרה', role: 'ילד/ה', avatar: 'ש' },
-  ],
+  inventoryList: [],
+  shoppingList: [],
+  currentUser: { id: null, name: '', email: '', isLoggedIn: false },
+  household: null,          // { id, name, invite_code }
+  memberId: null,           // household_members.id של המשתמש המחובר
+  familyMembers: [],
+  categories: [],           // [{ id, name, icon }]
+  settings: { notifications_enabled: true, dark_mode: false },
+  authTab: 'login',
   inventoryFilter: { search: '', status: 'הכל', category: 'הכל' },
   editingItemId: null,
   deletingItemId: null,
@@ -345,9 +340,145 @@ const state = {
 };
 
 // ============================================================
+// DATA LAYER (Supabase)
+// ============================================================
+function categoryIdByName(name) {
+  const c = state.categories.find(c => c.name === name) || state.categories.find(c => c.name === 'כללי');
+  return c ? c.id : null;
+}
+function categoryNameById(id) {
+  const c = state.categories.find(c => c.id === id);
+  return c ? c.name : 'כללי';
+}
+function memberName(id) {
+  const m = state.familyMembers.find(m => m.id === id);
+  return m ? m.name : '';
+}
+
+function rowToInventory(r) {
+  return { id: r.id, name: r.name, quantity: r.quantity, status: r.status, category: categoryNameById(r.category_id), notes: r.notes || '', lastUpdated: r.last_updated };
+}
+function inventoryToRow(i) {
+  return { id: i.id, household_id: state.household.id, category_id: categoryIdByName(i.category), name: i.name, quantity: i.quantity, status: i.status, notes: i.notes || null, updated_by: state.memberId };
+}
+function rowToShopping(r) {
+  return { id: r.id, inventoryItemId: r.inventory_item_id, name: r.name, requestedQuantity: r.requested_quantity, note: r.note || '', addedById: r.added_by, addedBy: memberName(r.added_by), addedAt: r.added_at, isCompleted: r.is_completed };
+}
+function shoppingToRow(s) {
+  return { id: s.id, household_id: state.household.id, inventory_item_id: s.inventoryItemId, name: s.name, requested_quantity: s.requestedQuantity, note: s.note || null, added_by: s.addedById || state.memberId, is_completed: s.isCompleted, completed_by: s.isCompleted ? state.memberId : null, completed_at: s.isCompleted ? new Date().toISOString() : null };
+}
+
+// Runs a Supabase request and shows an error on failure (the UI updates optimistically)
+async function dbRun(promise, errMsg = 'שגיאה בשמירה לשרת') {
+  const { data, error } = await promise;
+  if (error) {
+    console.error(error);
+    showToast(errMsg, 'error');
+    await loadHouseholdData();
+    return null;
+  }
+  return data;
+}
+
+function dbSaveInventory(item, isNew = false) {
+  const row = inventoryToRow(item);
+  if (isNew) row.created_by = state.memberId;
+  return dbRun(sb.from('inventory_items').upsert(row));
+}
+function dbDeleteInventory(id) {
+  return dbRun(sb.from('inventory_items').delete().eq('id', id));
+}
+function dbSaveShopping(item) {
+  return dbRun(sb.from('shopping_list_items').upsert(shoppingToRow(item)));
+}
+function dbDeleteShopping(ids) {
+  return dbRun(sb.from('shopping_list_items').delete().in('id', [].concat(ids)));
+}
+function dbLogHistory(itemId, action, before, after, sourceShoppingId = null) {
+  return dbRun(sb.from('inventory_history').insert({
+    inventory_item_id: itemId, member_id: state.memberId, action,
+    quantity_before: before ? before.quantity : null, quantity_after: after ? after.quantity : null,
+    status_before: before ? before.status : null, status_after: after ? after.status : null,
+    source_shopping_item_id: sourceShoppingId,
+  }));
+}
+
+async function loadSession() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) {
+    state.currentUser = { id: null, name: '', email: '', isLoggedIn: false };
+    state.household = null;
+    state.inventoryList = []; state.shoppingList = []; state.familyMembers = [];
+    return;
+  }
+  const u = session.user;
+  state.currentUser = { id: u.id, name: u.user_metadata?.display_name || u.email, email: u.email, isLoggedIn: true };
+
+  const { data: settings } = await sb.from('user_settings').select('*').eq('user_id', u.id).maybeSingle();
+  if (settings) state.settings = settings;
+
+  const { data: memberships } = await sb.from('household_members')
+    .select('id, household_id, households(id, name, invite_code)').eq('user_id', u.id);
+  const mine = (memberships || []).find(m => m.household_id === settings?.active_household_id) || (memberships || [])[0];
+  state.household = mine ? mine.households : null;
+  state.memberId = mine ? mine.id : null;
+
+  await loadHouseholdData();
+}
+
+async function loadHouseholdData() {
+  if (!state.household) return;
+  const hid = state.household.id;
+  const [cats, members, inv, shop] = await Promise.all([
+    sb.from('categories').select('*').order('sort_order'),
+    sb.from('household_members').select('*').eq('household_id', hid).order('created_at'),
+    sb.from('inventory_items').select('*').eq('household_id', hid).order('last_updated', { ascending: false }),
+    sb.from('shopping_list_items').select('*').eq('household_id', hid).order('added_at', { ascending: false }),
+  ]);
+  const err = cats.error || members.error || inv.error || shop.error;
+  if (err) { console.error(err); showToast('שגיאה בטעינת הנתונים', 'error'); return; }
+  state.categories = cats.data;
+  state.familyMembers = members.data.map(m => ({ id: m.id, name: m.name, role: m.role, avatar: m.avatar || m.name.charAt(0), isAdmin: m.is_admin }));
+  state.inventoryList = inv.data.map(rowToInventory);
+  state.shoppingList = shop.data.map(rowToShopping);
+  refreshUI();
+}
+
+let realtimeChannel = null;
+let reloadTimer = null;
+function subscribeRealtime() {
+  if (realtimeChannel) { sb.removeChannel(realtimeChannel); realtimeChannel = null; }
+  if (!state.household) return;
+  const hid = state.household.id;
+  const onChange = () => { clearTimeout(reloadTimer); reloadTimer = setTimeout(loadHouseholdData, 400); };
+  realtimeChannel = sb.channel('household-' + hid);
+  ['inventory_items', 'shopping_list_items', 'household_members'].forEach(table => {
+    realtimeChannel.on('postgres_changes', { event: '*', schema: 'public', table, filter: 'household_id=eq.' + hid }, onChange);
+  });
+  realtimeChannel.subscribe();
+}
+
+function refreshUI() {
+  if (!document.getElementById('main-content')) return;
+  renderActiveTab();
+  updateHeader();
+  if (state.openModals.includes('profile')) renderProfileModal();
+}
+
+function updateHeader() {
+  const title = state.household ? state.household.name : 'בית המשפחה';
+  const sub = document.getElementById('header-subtitle');
+  if (sub) sub.textContent = title;
+  const initials = document.getElementById('user-avatar-initials');
+  if (initials) initials.textContent = (state.currentUser.name || 'א').charAt(0);
+  const lowCount = state.inventoryList.filter(i => i.status === 'כמעט ריק').length;
+  document.getElementById('notif-badge').classList.toggle('hidden', lowCount === 0);
+}
+
+// ============================================================
 // UTILS
 // ============================================================
-function genId() { return '_' + Math.random().toString(36).substr(2, 9); }
+function genId() { return crypto.randomUUID(); }
 
 function statusConfig(s) {
   if (s === 'מלא') return { bg: 'bg-status-full-bg', text: 'text-status-full-text', label: 'מלא' };
@@ -355,12 +486,23 @@ function statusConfig(s) {
   return { bg: 'bg-status-empty-bg', text: 'text-status-empty-text', label: 'כמעט ריק' };
 }
 
+// A single status-by-quantity calculation (replaces the two different ones in the old code)
+function statusFromQuantity(q) {
+  return q >= 3 ? 'מלא' : q >= 1 ? 'חצי' : 'כמעט ריק';
+}
+
 function cycleStatus(current) {
   const order = ['מלא', 'חצי', 'כמעט ריק'];
   return order[(order.indexOf(current) + 1) % 3];
 }
 
+function categoryNames() {
+  return state.categories.length ? state.categories.map(c => c.name) : ['מקרר', 'מזווה', 'חומרי ניקוי', 'קפאון', 'כללי'];
+}
+
 function categoryIcon(cat) {
+  const dbCat = state.categories.find(c => c.name === cat);
+  if (dbCat && dbCat.icon) return dbCat.icon;
   const map = { 'מקרר': 'kitchen', 'מזווה': 'shelves', 'חומרי ניקוי': 'cleaning_services', 'קפאון': 'ac_unit', 'כללי': 'category' };
   return map[cat] || 'category';
 }
@@ -496,7 +638,7 @@ function renderInventoryScreen() {
   });
 
   const statusChips = ['הכל', 'מלא', 'חצי', 'כמעט ריק'];
-  const catChips = ['הכל', 'מקרר', 'מזווה', 'חומרי ניקוי', 'קפאון', 'כללי'];
+  const catChips = ['הכל', ...categoryNames()];
 
   return `
     <!-- Search -->
@@ -618,10 +760,12 @@ function reRenderInventoryList() {
 function cycleItemStatus(id) {
   const item = state.inventoryList.find(i => i.id === id);
   if (!item) return;
+  const before = { ...item };
   item.status = cycleStatus(item.status);
   item.lastUpdated = new Date().toISOString();
   renderActiveTab();
   showToast(`${item.name}: ${item.status}`, 'sync');
+  dbSaveInventory(item).then(() => dbLogHistory(item.id, 'status_changed', before, item));
 }
 
 function quickAddToCart(itemId) {
@@ -633,17 +777,21 @@ function quickAddToCart(itemId) {
     state.shoppingList = state.shoppingList.filter(s => s.id !== existing.id);
     renderActiveTab();
     showToast(`${item.name} הוסר מהרשימה`, 'remove_shopping_cart');
+    dbDeleteShopping(existing.id);
   } else {
-    state.shoppingList.unshift({
+    const newItem = {
       id: genId(),
       inventoryItemId: itemId,
       name: item.name,
       requestedQuantity: 1,
       note: '',
-      addedBy: 'אני',
+      addedById: state.memberId,
+      addedBy: memberName(state.memberId),
       addedAt: new Date().toISOString(),
       isCompleted: false,
-    });
+    };
+    state.shoppingList.unshift(newItem);
+    dbSaveShopping(newItem);
     renderActiveTab();
     showToast(`${item.name} נוסף לרשימה!`, 'shopping_cart');
   }
@@ -748,16 +896,19 @@ function shopQuickAdd() {
   // Check if exists in inventory
   const invMatch = state.inventoryList.find(i => i.name === name);
 
-  state.shoppingList.unshift({
+  const newItem = {
     id: genId(),
     inventoryItemId: invMatch ? invMatch.id : null,
     name,
     requestedQuantity: qty,
     note: '',
-    addedBy: 'אני',
+    addedById: state.memberId,
+    addedBy: memberName(state.memberId),
     addedAt: new Date().toISOString(),
     isCompleted: false,
-  });
+  };
+  state.shoppingList.unshift(newItem);
+  dbSaveShopping(newItem);
   nameEl.value = '';
   qtyEl.value = '1';
   renderActiveTab();
@@ -768,14 +919,17 @@ function toggleShoppingItem(id, checked) {
   const item = state.shoppingList.find(s => s.id === id);
   if (!item) return;
   item.isCompleted = checked;
+  dbSaveShopping(item);
 
   // Sync inventory if linked
   if (checked && item.inventoryItemId) {
     const invItem = state.inventoryList.find(i => i.id === item.inventoryItemId);
     if (invItem) {
+      const before = { ...invItem };
       invItem.quantity += item.requestedQuantity;
-      invItem.status = invItem.quantity >= 3 ? 'מלא' : invItem.quantity >= 1 ? 'חצי' : 'כמעט ריק';
+      invItem.status = statusFromQuantity(invItem.quantity);
       invItem.lastUpdated = new Date().toISOString();
+      dbSaveInventory(invItem).then(() => dbLogHistory(invItem.id, 'restocked', before, invItem, item.id));
       showToast(`${invItem.name} עודכן במלאי!`, 'sync');
     }
   } else if (checked) {
@@ -788,11 +942,14 @@ function toggleShoppingItem(id, checked) {
 function removeShoppingItem(id) {
   const item = state.shoppingList.find(s => s.id === id);
   state.shoppingList = state.shoppingList.filter(s => s.id !== id);
+  dbDeleteShopping(id);
   renderActiveTab();
   if (item) showToast(`${item.name} הוסר`, 'delete');
 }
 
 function clearCompleted() {
+  const doneIds = state.shoppingList.filter(s => s.isCompleted).map(s => s.id);
+  if (doneIds.length) dbDeleteShopping(doneIds);
   state.shoppingList = state.shoppingList.filter(s => !s.isCompleted);
   renderActiveTab();
   showToast('פריטים שנרכשו נמחקו', 'done_all');
@@ -876,7 +1033,7 @@ function renderQuickAddForm() {
       <div class="mb-4">
         <label class="text-label-lg text-on-surface-variant mb-1.5 block">קטגוריה</label>
         <div class="flex gap-2 flex-wrap">
-          ${['מקרר','מזווה','חומרי ניקוי','קפאון','כללי'].map(cat => `
+          ${categoryNames().map(cat => `
             <button onclick="selectQACategory('${cat}')" id="qa-cat-${cat.replace(/ /g,'_')}"
               class="flex items-center gap-1 px-3 py-1.5 rounded-full border border-outline-variant text-label-lg text-on-surface-variant bg-surface-container-lowest transition-all active:scale-95 qa-cat-btn">
               <span class="material-symbols-outlined" style="font-size:14px">${categoryIcon(cat)}</span>
@@ -1012,26 +1169,33 @@ function submitQuickAdd() {
   if (state.quickAddMode === 'existing' && state.quickAddSelectedItem) {
     const item = state.inventoryList.find(i => i.id === state.quickAddSelectedItem.id);
     if (item) {
+      const before = { ...item };
       item.quantity += qty;
-      item.status = item.quantity >= 4 ? 'מלא' : item.quantity >= 2 ? 'חצי' : 'כמעט ריק';
+      item.status = statusFromQuantity(item.quantity);
       item.lastUpdated = new Date().toISOString();
+      dbSaveInventory(item).then(() => dbLogHistory(item.id, 'restocked', before, item));
       showToast(`${item.name} עודכן! כמות: ${item.quantity}`, 'inventory');
     }
   } else {
     const existing = state.inventoryList.find(i => i.name === name);
     if (existing) {
+      const before = { ...existing };
       existing.quantity += qty;
       existing.lastUpdated = new Date().toISOString();
+      dbSaveInventory(existing).then(() => dbLogHistory(existing.id, 'restocked', before, existing));
       showToast(`${name} עודכן במלאי!`, 'inventory');
     } else {
-      state.inventoryList.unshift({
+      const newItem = {
         id: genId(),
         name,
         quantity: qty,
         status: qaSelectedStatus,
         category: qaSelectedCategory,
+        notes: '',
         lastUpdated: new Date().toISOString(),
-      });
+      };
+      state.inventoryList.unshift(newItem);
+      dbSaveInventory(newItem, true).then(() => dbLogHistory(newItem.id, 'created', null, newItem));
       showToast(`${name} נוסף למלאי!`, 'add_circle');
     }
   }
@@ -1077,7 +1241,7 @@ function renderEditModal() {
     <div class="mb-4">
       <label class="text-label-lg text-on-surface-variant mb-1.5 block">קטגוריה</label>
       <div class="flex gap-2 flex-wrap">
-        ${['מקרר','מזווה','חומרי ניקוי','קפאון','כללי'].map(cat => `
+        ${categoryNames().map(cat => `
           <button onclick="selectEditCategory('${cat}')" id="edit-cat-${cat.replace(/ /g,'_')}"
             class="flex items-center gap-1 px-3 py-1.5 rounded-full border text-label-lg transition-all active:scale-95 edit-cat-btn
               ${item.category === cat ? 'bg-primary text-white border-primary' : 'border-outline-variant text-on-surface-variant bg-surface-container-lowest'}">
@@ -1177,12 +1341,14 @@ function saveEditItem(id) {
   const newName = nameEl.value.trim();
   if (!newName) { nameEl.focus(); return; }
 
+  const before = { ...item };
   item.name = newName;
   item.quantity = parseInt(qtyEl.value) || 0;
   item.category = window._editCategory || item.category;
   item.status = window._editStatus || item.status;
   item.notes = notesEl ? notesEl.value.trim() : '';
   item.lastUpdated = new Date().toISOString();
+  dbSaveInventory(item).then(() => dbLogHistory(item.id, before.status !== item.status ? 'status_changed' : 'updated', before, item));
 
   closeModal('edit');
   if (state.currentTab === 'inventory') renderActiveTab();
@@ -1216,6 +1382,7 @@ function confirmDelete() {
   state.inventoryList = state.inventoryList.filter(i => i.id !== id);
   // Remove linked shopping items
   state.shoppingList = state.shoppingList.map(s => s.inventoryItemId === id ? { ...s, inventoryItemId: null } : s);
+  dbDeleteInventory(id); // ON DELETE SET NULL takes care of the shopping list on the server
   cancelDelete();
   closeModal('edit');
   if (state.currentTab === 'inventory') renderActiveTab();
@@ -1233,20 +1400,25 @@ function renderProfileModal() {
     content.innerHTML = renderAuthForm();
     return;
   }
+  if (!state.household) {
+    content.innerHTML = renderHouseholdSetup();
+    return;
+  }
+  const hh = state.household;
 
   content.innerHTML = `
     <!-- Household Card -->
     <div class="bg-gradient-to-l from-primary to-primary-container rounded-2xl p-5 mb-5 text-white">
       <div class="flex items-center gap-4">
         <div class="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center text-2xl font-bold">
-          ${user.name.charAt(0)}
+          ${escapeHtml(hh.name.charAt(0))}
         </div>
         <div>
-          <div class="text-title-lg font-bold">${escapeHtml(user.name)}</div>
+          <div class="text-title-lg font-bold">${escapeHtml(hh.name)}</div>
           <div class="text-body-sm opacity-80">${escapeHtml(user.email)}</div>
           <div class="mt-1 inline-flex items-center gap-1 bg-white/20 px-2 py-0.5 rounded-full text-label-sm">
-            <span class="material-symbols-outlined" style="font-size:12px">home</span>
-            בית משפחה
+            <span class="material-symbols-outlined" style="font-size:12px">key</span>
+            קוד הזמנה: <b dir="ltr">${escapeHtml(hh.invite_code || '')}</b>
           </div>
         </div>
       </div>
@@ -1275,7 +1447,7 @@ function renderProfileModal() {
         ${state.familyMembers.map(m => `
           <div class="flex items-center gap-3 bg-surface-container rounded-xl px-4 py-3">
             <div class="w-10 h-10 rounded-full bg-secondary-container flex items-center justify-center text-primary font-bold">
-              ${m.avatar}
+              ${escapeHtml(m.avatar)}
             </div>
             <div class="flex-1">
               <div class="text-body-lg font-medium text-on-surface">${escapeHtml(m.name)}</div>
@@ -1283,7 +1455,7 @@ function renderProfileModal() {
             </div>
             <span class="material-symbols-outlined text-on-surface-variant opacity-40">chevron_left</span>
           </div>`).join('')}
-        <button class="flex items-center gap-3 bg-surface-container rounded-xl px-4 py-3 border-2 border-dashed border-outline-variant text-on-surface-variant active:scale-95 transition-transform w-full">
+        <button onclick="inviteFamilyMember()" class="flex items-center gap-3 bg-surface-container rounded-xl px-4 py-3 border-2 border-dashed border-outline-variant text-on-surface-variant active:scale-95 transition-transform w-full">
           <div class="w-10 h-10 rounded-full bg-surface-container-lowest border-2 border-dashed border-outline-variant flex items-center justify-center">
             <span class="material-symbols-outlined">add</span>
           </div>
@@ -1300,7 +1472,7 @@ function renderProfileModal() {
           <span class="text-body-lg text-on-surface">התראות</span>
         </div>
         <label class="relative inline-flex items-center cursor-pointer">
-          <input type="checkbox" class="sr-only peer" checked>
+          <input type="checkbox" class="sr-only peer" ${state.settings.notifications_enabled ? 'checked' : ''} onchange="saveSetting('notifications_enabled', this.checked)">
           <div class="w-11 h-6 bg-outline-variant rounded-full peer-checked:bg-primary transition-colors"></div>
           <div class="absolute right-1 top-1 w-4 h-4 bg-white rounded-full shadow transition-transform peer-checked:translate-x-[-1.25rem]"></div>
         </label>
@@ -1311,7 +1483,7 @@ function renderProfileModal() {
           <span class="text-body-lg text-on-surface">מצב כהה</span>
         </div>
         <label class="relative inline-flex items-center cursor-pointer">
-          <input type="checkbox" class="sr-only peer">
+          <input type="checkbox" class="sr-only peer" ${state.settings.dark_mode ? 'checked' : ''} onchange="saveSetting('dark_mode', this.checked)">
           <div class="w-11 h-6 bg-outline-variant rounded-full peer-checked:bg-primary transition-colors"></div>
           <div class="absolute right-1 top-1 w-4 h-4 bg-white rounded-full shadow transition-transform peer-checked:translate-x-[-1.25rem]"></div>
         </label>
@@ -1327,6 +1499,7 @@ function renderProfileModal() {
 }
 
 function renderAuthForm() {
+  const isSignup = state.authTab === 'signup';
   return `
     <div class="text-center py-8">
       <div class="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
@@ -1335,45 +1508,140 @@ function renderAuthForm() {
       <h3 class="text-title-lg font-bold text-on-surface mb-2">כניסה לבית המשפחה</h3>
       <p class="text-body-md text-on-surface-variant mb-6">התחבר לניהול המלאי המשפחתי</p>
       <div class="flex gap-3 mb-4">
-        <button onclick="showAuthTab('login')" id="auth-tab-login" class="flex-1 py-2 rounded-xl bg-primary text-white font-bold">כניסה</button>
-        <button onclick="showAuthTab('signup')" id="auth-tab-signup" class="flex-1 py-2 rounded-xl bg-surface-container text-on-surface-variant font-medium">הרשמה</button>
+        <button onclick="showAuthTab('login')" id="auth-tab-login" class="flex-1 py-2 rounded-xl ${!isSignup ? 'bg-primary text-white font-bold' : 'bg-surface-container text-on-surface-variant font-medium'}">כניסה</button>
+        <button onclick="showAuthTab('signup')" id="auth-tab-signup" class="flex-1 py-2 rounded-xl ${isSignup ? 'bg-primary text-white font-bold' : 'bg-surface-container text-on-surface-variant font-medium'}">הרשמה</button>
       </div>
       <div class="flex flex-col gap-3">
-        <input type="email" placeholder="אימייל" class="w-full bg-surface-container rounded-xl px-4 py-3 text-body-lg border border-outline-variant focus:outline-none focus:border-primary">
-        <input type="password" placeholder="סיסמה" class="w-full bg-surface-container rounded-xl px-4 py-3 text-body-lg border border-outline-variant focus:outline-none focus:border-primary">
-        <button onclick="loginDemo()" class="w-full bg-primary text-white rounded-xl py-3.5 text-title-sm font-bold active:scale-95 transition-transform">כניסה</button>
+        ${isSignup ? `<input type="text" id="auth-name" placeholder="השם שלך" class="w-full bg-surface-container rounded-xl px-4 py-3 text-body-lg border border-outline-variant focus:outline-none focus:border-primary">` : ''}
+        <input type="email" id="auth-email" placeholder="אימייל" dir="ltr" class="w-full bg-surface-container rounded-xl px-4 py-3 text-body-lg border border-outline-variant focus:outline-none focus:border-primary text-right">
+        <input type="password" id="auth-password" placeholder="סיסמה (לפחות 6 תווים)" dir="ltr" class="w-full bg-surface-container rounded-xl px-4 py-3 text-body-lg border border-outline-variant focus:outline-none focus:border-primary text-right"
+          onkeydown="if(event.key==='Enter') submitAuth()">
+        <button onclick="submitAuth()" id="auth-submit" class="w-full bg-primary text-white rounded-xl py-3.5 text-title-sm font-bold active:scale-95 transition-transform">${isSignup ? 'הרשמה' : 'כניסה'}</button>
       </div>
     </div>
   `;
 }
 
-function logout() {
-  state.currentUser.isLoggedIn = false;
-  renderProfileModal();
+function renderHouseholdSetup() {
+  return `
+    <div class="py-4">
+      <div class="text-center mb-6">
+        <div class="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
+          <span class="material-symbols-outlined text-primary text-3xl">home</span>
+        </div>
+        <h3 class="text-title-lg font-bold text-on-surface mb-1">שלום ${escapeHtml(state.currentUser.name)}!</h3>
+        <p class="text-body-md text-on-surface-variant">צור בית חדש או הצטרף לבית קיים עם קוד הזמנה</p>
+      </div>
+      <div class="flex flex-col gap-3 mb-4">
+        <input type="text" id="hh-member-name" placeholder="השם שלך במשפחה" value="${escapeHtml(state.currentUser.name.includes('@') ? '' : state.currentUser.name)}" class="w-full bg-surface-container rounded-xl px-4 py-3 text-body-lg border border-outline-variant focus:outline-none focus:border-primary">
+        <select id="hh-role" class="w-full bg-surface-container rounded-xl px-4 py-3 text-body-lg border border-outline-variant focus:outline-none focus:border-primary">
+          ${['אבא','אמא','ילד/ה','אחר'].map(r => `<option value="${r}">${r}</option>`).join('')}
+        </select>
+      </div>
+      <div class="bg-surface-container rounded-2xl p-4 mb-3">
+        <h4 class="text-title-sm font-bold text-on-surface mb-2">בית חדש</h4>
+        <div class="flex gap-2">
+          <input type="text" id="hh-name" placeholder="למשל: משפחת אמודאי" class="flex-1 bg-surface-container-lowest rounded-xl px-3 py-2.5 text-body-md border border-outline-variant focus:outline-none focus:border-primary">
+          <button onclick="createHousehold()" class="px-4 bg-primary text-white rounded-xl font-bold active:scale-95 transition-transform">צור</button>
+        </div>
+      </div>
+      <div class="bg-surface-container rounded-2xl p-4 mb-5">
+        <h4 class="text-title-sm font-bold text-on-surface mb-2">הצטרפות עם קוד</h4>
+        <div class="flex gap-2">
+          <input type="text" id="hh-code" placeholder="קוד הזמנה" dir="ltr" class="flex-1 bg-surface-container-lowest rounded-xl px-3 py-2.5 text-body-md border border-outline-variant focus:outline-none focus:border-primary uppercase text-right">
+          <button onclick="joinHousehold()" class="px-4 bg-primary text-white rounded-xl font-bold active:scale-95 transition-transform">הצטרף</button>
+        </div>
+      </div>
+      <button onclick="logout()" class="w-full text-on-surface-variant py-2 text-body-md">התנתקות</button>
+    </div>
+  `;
+}
+
+async function submitAuth() {
+  const email = document.getElementById('auth-email')?.value.trim();
+  const password = document.getElementById('auth-password')?.value;
+  const nameEl = document.getElementById('auth-name');
+  if (!email || !password) { showToast('נא למלא אימייל וסיסמה', 'error'); return; }
+  const btn = document.getElementById('auth-submit');
+  if (btn) btn.disabled = true;
+
+  let result;
+  if (state.authTab === 'signup') {
+    result = await sb.auth.signUp({ email, password, options: { data: { display_name: nameEl?.value.trim() || null } } });
+    if (!result.error && !result.data.session) {
+      showToast('נשלח אליך מייל לאימות החשבון', 'mail');
+      if (btn) btn.disabled = false;
+      return;
+    }
+  } else {
+    result = await sb.auth.signInWithPassword({ email, password });
+  }
+  if (btn) btn.disabled = false;
+  if (result.error) {
+    console.error(result.error);
+    showToast(result.error.message.includes('Invalid login') ? 'אימייל או סיסמה שגויים' : 'שגיאה: ' + result.error.message, 'error');
+    return;
+  }
+  sb.from('users').update({ last_login_at: new Date().toISOString() }).eq('id', result.data.user.id).then(() => {});
+  // The rest happens in onAuthStateChange
+}
+
+async function createHousehold() {
+  const name = document.getElementById('hh-name')?.value.trim();
+  const memberNameVal = document.getElementById('hh-member-name')?.value.trim();
+  const role = document.getElementById('hh-role')?.value;
+  if (!name || !memberNameVal) { showToast('נא למלא את שם הבית ואת השם שלך', 'error'); return; }
+  const { error } = await sb.rpc('create_household', { p_name: name, p_member_name: memberNameVal, p_role: role });
+  if (error) { console.error(error); showToast('שגיאה ביצירת הבית', 'error'); return; }
+  await afterLogin();
+  showToast(`ברוכים הבאים ל${name}!`, 'family_home');
+}
+
+async function joinHousehold() {
+  const code = document.getElementById('hh-code')?.value.trim();
+  const memberNameVal = document.getElementById('hh-member-name')?.value.trim();
+  const role = document.getElementById('hh-role')?.value;
+  if (!code || !memberNameVal) { showToast('נא למלא קוד הזמנה ואת השם שלך', 'error'); return; }
+  const { data, error } = await sb.rpc('join_household', { p_invite_code: code, p_member_name: memberNameVal, p_role: role });
+  if (error) { console.error(error); showToast('קוד הזמנה לא תקין', 'error'); return; }
+  await afterLogin();
+  showToast(`הצטרפת ל${data.name}!`, 'family_home');
+}
+
+function inviteFamilyMember() {
+  const code = state.household?.invite_code;
+  if (!code) return;
+  if (navigator.clipboard) navigator.clipboard.writeText(code).catch(() => {});
+  showToast(`קוד ההזמנה ${code} הועתק. שלחו אותו לבן המשפחה`, 'content_copy');
+}
+
+async function saveSetting(key, value) {
+  state.settings[key] = value;
+  if (key === 'dark_mode') document.documentElement.classList.toggle('dark', value);
+  await dbRun(sb.from('user_settings').update({ [key]: value }).eq('user_id', state.currentUser.id));
+}
+
+async function afterLogin() {
+  await loadSession();
+  subscribeRealtime();
+  refreshUI();
+  if (state.household) {
+    closeModal('profile');
+  } else if (state.openModals.includes('profile')) {
+    renderProfileModal();
+  } else {
+    openModal('profile');
+  }
+}
+
+async function logout() {
+  await sb.auth.signOut();
   showToast('התנתקת בהצלחה', 'logout');
 }
 
-function loginDemo() {
-  state.currentUser.isLoggedIn = true;
-  closeModal('profile');
-  showToast('ברוך הבא, משפחת אמודאי!', 'family_home');
-}
-
 function showAuthTab(tab) {
-  const loginBtn = document.getElementById('auth-tab-login');
-  const signupBtn = document.getElementById('auth-tab-signup');
-  if (!loginBtn || !signupBtn) return;
-  if (tab === 'login') {
-    loginBtn.classList.add('bg-primary', 'text-white');
-    loginBtn.classList.remove('bg-surface-container', 'text-on-surface-variant');
-    signupBtn.classList.remove('bg-primary', 'text-white');
-    signupBtn.classList.add('bg-surface-container', 'text-on-surface-variant');
-  } else {
-    signupBtn.classList.add('bg-primary', 'text-white');
-    signupBtn.classList.remove('bg-surface-container', 'text-on-surface-variant');
-    loginBtn.classList.remove('bg-primary', 'text-white');
-    loginBtn.classList.add('bg-surface-container', 'text-on-surface-variant');
-  }
+  state.authTab = tab;
+  renderProfileModal();
 }
 
 // ============================================================
@@ -1387,14 +1655,27 @@ function escapeHtml(str) {
 // ============================================================
 // INIT
 // ============================================================
-function init() {
+async function init() {
   switchTab('inventory');
   updateNavBar();
-  // Show low-stock badge
-  const lowCount = state.inventoryList.filter(i => i.status === 'כמעט ריק').length;
-  if (lowCount > 0) {
-    document.getElementById('notif-badge').classList.remove('hidden');
-  }
+  await loadSession();
+  document.documentElement.classList.toggle('dark', !!state.settings.dark_mode);
+  subscribeRealtime();
+  refreshUI();
+  if (!state.currentUser.isLoggedIn || !state.household) openModal('profile');
+
+  sb.auth.onAuthStateChange((event) => {
+    if (event === 'SIGNED_IN') setTimeout(afterLogin, 0);
+    if (event === 'SIGNED_OUT') {
+      setTimeout(async () => {
+        await loadSession();
+        subscribeRealtime();
+        refreshUI();
+        if (!state.openModals.includes('profile')) openModal('profile');
+        else renderProfileModal();
+      }, 0);
+    }
+  });
 }
 
 document.addEventListener('DOMContentLoaded', init);
