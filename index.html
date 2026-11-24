@@ -107,8 +107,21 @@ tailwind.config = {
   .bottom-sheet.closed { transform: translateY(100%); }
   .bottom-sheet.open { transform: translateY(0); }
   .center-modal { transition: opacity 0.2s ease, transform 0.2s ease; }
-  .center-modal.closed { opacity: 0; transform: scale(0.95); }
-  .center-modal.open { opacity: 1; transform: scale(1); }
+  /* A closed dialog is fully hidden and doesn't receive taps (otherwise it's a transparent layer blocking the middle of the screen) */
+  .center-modal.closed { opacity: 0; transform: scale(0.95); visibility: hidden; pointer-events: none !important;
+    transition: opacity 0.2s ease, transform 0.2s ease, visibility 0s linear 0.2s; }
+  .center-modal.open { opacity: 1; transform: scale(1); visibility: visible; }
+  /* Same for bottom sheets: after the close animation they're hidden and don't receive taps */
+  .bottom-sheet.closed { visibility: hidden; pointer-events: none !important;
+    transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1), visibility 0s linear 0.3s; }
+  .bottom-sheet.open { visibility: visible; }
+
+  /* ---------- Touch ---------- */
+  /* Removes the double-tap-zoom delay and the gray flash on tap */
+  button, a, label, input, select, textarea, [onclick] { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+  input, textarea, select { user-select: text; -webkit-user-select: text; }
+  /* iOS zooms in on focus when an input's text is smaller than 16px */
+  @media (max-width: 767px) { input, select, textarea { font-size: 16px !important; } }
 
   /* Toast */
   .toast { transition: opacity 0.3s ease, transform 0.3s ease; }
@@ -201,7 +214,7 @@ tailwind.config = {
   </main>
 
   <!-- BOTTOM NAV -->
-  <nav id="bottom-nav" class="hidden fixed bottom-0 inset-x-0 mx-auto w-full max-w-lg bg-surface-container-lowest border-t border-outline-variant safe-bottom z-40">
+  <nav id="bottom-nav" class="hidden fixed bottom-0 inset-x-0 mx-auto w-full max-w-lg bg-surface-container-lowest border-t border-outline-variant safe-bottom z-30">
     <div class="flex items-end justify-around px-2 pt-2 pb-2 relative">
       <!-- Inventory Tab -->
       <button onclick="switchTab('inventory')" id="tab-inventory" class="flex flex-col items-center gap-1 flex-1 py-1 px-2 rounded-xl transition-all">
@@ -231,11 +244,11 @@ tailwind.config = {
      ============================================================ -->
 
 <!-- BACKDROP -->
-<div id="modal-backdrop" class="fixed inset-0 bg-black/50 z-50 modal-backdrop opacity-0 pointer-events-none" onclick="closeTopModal()"></div>
+<div id="modal-backdrop" class="fixed inset-0 bg-black/50 z-40 modal-backdrop opacity-0 pointer-events-none" onclick="closeTopModal()"></div>
 
 <!-- MODAL: Quick Add (Bottom Sheet) -->
 <!-- Centered with inset-x-0 + mx-auto and not translate-x, because the open/close animation overrides transform -->
-<div id="modal-quickAdd" class="fixed bottom-0 inset-x-0 mx-auto w-full max-w-lg bg-surface-container-lowest rounded-t-3xl z-60 bottom-sheet closed shadow-2xl sheet-scroll" style="z-index:60;">
+<div id="modal-quickAdd" class="fixed bottom-0 inset-x-0 mx-auto w-full max-w-lg bg-surface-container-lowest rounded-t-3xl z-50 bottom-sheet closed shadow-2xl sheet-scroll">
   <div class="sticky top-0 bg-surface-container-lowest pt-3 pb-2 z-10">
     <div class="w-10 h-1 bg-outline-variant rounded-full mx-auto mb-3"></div>
     <div class="flex items-center justify-between px-4 pb-2 border-b border-outline-variant">
@@ -251,7 +264,7 @@ tailwind.config = {
 </div>
 
 <!-- MODAL: Edit Product -->
-<div id="modal-edit" class="fixed inset-0 flex items-end justify-center z-60 pointer-events-none" style="z-index:60;">
+<div id="modal-edit" class="fixed inset-0 flex items-end justify-center z-50 pointer-events-none">
   <div id="modal-edit-sheet" class="pointer-events-auto w-full max-w-lg bg-surface-container-lowest rounded-t-3xl bottom-sheet closed shadow-2xl sheet-scroll">
     <div class="sticky top-0 bg-surface-container-lowest pt-3 pb-2 z-10">
       <div class="w-10 h-1 bg-outline-variant rounded-full mx-auto mb-3"></div>
@@ -269,7 +282,7 @@ tailwind.config = {
 </div>
 
 <!-- MODAL: Profile -->
-<div id="modal-profile" class="fixed inset-0 flex items-end justify-center z-60 pointer-events-none" style="z-index:60;">
+<div id="modal-profile" class="fixed inset-0 flex items-end justify-center z-50 pointer-events-none">
   <div id="modal-profile-sheet" class="pointer-events-auto w-full max-w-lg bg-surface-container-lowest rounded-t-3xl bottom-sheet closed shadow-2xl sheet-scroll">
     <div class="sticky top-0 bg-surface-container-lowest pt-3 pb-2 z-10">
       <div class="w-10 h-1 bg-outline-variant rounded-full mx-auto mb-3"></div>
@@ -287,7 +300,7 @@ tailwind.config = {
 </div>
 
 <!-- MODAL: Notifications (simple) -->
-<div id="modal-notifications" class="fixed inset-0 flex items-end justify-center z-60 pointer-events-none" style="z-index:60;">
+<div id="modal-notifications" class="fixed inset-0 flex items-end justify-center z-50 pointer-events-none">
   <div class="pointer-events-auto w-full max-w-lg bg-surface-container-lowest rounded-t-3xl bottom-sheet closed shadow-2xl sheet-scroll-sm" id="modal-notifications-sheet">
     <div class="sticky top-0 bg-surface-container-lowest pt-3 pb-2 z-10">
       <div class="w-10 h-1 bg-outline-variant rounded-full mx-auto mb-3"></div>
