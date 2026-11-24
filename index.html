@@ -81,6 +81,26 @@ tailwind.config = {
   .safe-bottom { padding-bottom: max(1rem, env(safe-area-inset-bottom)); }
   .bottom-safe { bottom: max(0px, env(safe-area-inset-bottom)); }
 
+  /* ---------- Responsive: nothing wider than the screen, from 320px to desktop ---------- */
+  /* clip (unlike hidden) doesn't create a scroll container, so the sticky header keeps working; hidden is the fallback for old browsers */
+  html, body, #app { max-width: 100%; overflow-x: hidden; overflow-x: clip; }
+  body { overflow-wrap: break-word; -webkit-text-size-adjust: 100%; }
+  /* Screen height that accounts for the mobile browser's address bar (dvh), with a vh fallback for older browsers */
+  .app-min-h { min-height: 100vh; min-height: 100dvh; }
+  /* Flex items can shrink below their content width, so long text doesn't push buttons off the screen */
+  .flex-1, .truncate { min-width: 0; }
+  input, select, textarea, button { max-width: 100%; }
+  input, select, textarea { min-width: 0; }
+  /* Content area: room for the bottom nav bar + the safe area on iPhone */
+  .main-safe { padding-bottom: calc(6rem + env(safe-area-inset-bottom)); }
+  /* Bottom sheets: limited to the screen height, scroll internally, padding above the iPhone home bar */
+  .sheet-scroll { max-height: 88vh; max-height: 88dvh; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+  .sheet-scroll-sm { max-height: 60vh; max-height: 60dvh; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; }
+  .sheet-body { padding-bottom: calc(2rem + env(safe-area-inset-bottom)); }
+  /* Horizontal filter rows: scroll within themselves without widening the page */
+  .chip-row { width: 100%; max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .chip-row::-webkit-scrollbar { display: none; }
+
   /* Modal animations */
   .modal-backdrop { transition: opacity 0.25s ease; }
   .bottom-sheet { transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1); }
@@ -153,22 +173,22 @@ tailwind.config = {
   }
 </style>
 </head>
-<body class="bg-surface min-h-screen">
+<body class="bg-surface app-min-h">
 
 <!-- App Container -->
-<div class="max-w-lg mx-auto relative min-h-screen flex flex-col bg-surface-container-lowest shadow-xl" id="app">
+<div class="w-full max-w-lg mx-auto relative app-min-h flex flex-col bg-surface-container-lowest shadow-xl" id="app">
 
   <!-- TOP APP BAR -->
-  <header class="bg-surface-container-lowest border-b border-outline-variant px-4 pt-safe" style="padding-top: max(0.75rem, env(safe-area-inset-top));">
-    <div class="flex items-center justify-between h-14">
-      <button onclick="openModal('profile')" class="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white font-bold text-lg shadow-sm active:scale-95 transition-transform">
+  <header class="sticky top-0 z-30 w-full bg-surface-container-lowest border-b border-outline-variant px-4 pt-safe" style="padding-top: max(0.75rem, env(safe-area-inset-top));">
+    <div class="flex items-center justify-between gap-2 h-14">
+      <button onclick="openModal('profile')" class="shrink-0 w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white font-bold text-lg shadow-sm active:scale-95 transition-transform">
         <span id="user-avatar-initials">א</span>
       </button>
-      <div class="text-center">
-        <div class="text-title-md font-bold text-on-surface" id="header-title">מלאי הבית</div>
-        <div class="text-label-md text-on-surface-variant" id="header-subtitle"></div>
+      <div class="flex-1 min-w-0 text-center">
+        <div class="text-title-md font-bold text-on-surface truncate" id="header-title">מלאי הבית</div>
+        <div class="text-label-md text-on-surface-variant truncate" id="header-subtitle"></div>
       </div>
-      <button onclick="openModal('notifications')" id="notif-button" class="invisible w-10 h-10 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container active:scale-95 transition-transform relative">
+      <button onclick="openModal('notifications')" id="notif-button" class="invisible shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container active:scale-95 transition-transform relative">
         <span class="material-symbols-outlined">notifications</span>
         <span id="notif-badge" class="absolute top-1 right-1 w-2 h-2 bg-error rounded-full hidden"></span>
       </button>
@@ -176,12 +196,12 @@ tailwind.config = {
   </header>
 
   <!-- MAIN CONTENT AREA -->
-  <main class="flex-1 overflow-y-auto pb-24" id="main-content">
+  <main class="flex-1 w-full min-w-0 main-safe" id="main-content">
     <!-- Screens rendered here -->
   </main>
 
   <!-- BOTTOM NAV -->
-  <nav id="bottom-nav" class="hidden fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-lg bg-surface-container-lowest border-t border-outline-variant safe-bottom z-40">
+  <nav id="bottom-nav" class="hidden fixed bottom-0 inset-x-0 mx-auto w-full max-w-lg bg-surface-container-lowest border-t border-outline-variant safe-bottom z-40">
     <div class="flex items-end justify-around px-2 pt-2 pb-2 relative">
       <!-- Inventory Tab -->
       <button onclick="switchTab('inventory')" id="tab-inventory" class="flex flex-col items-center gap-1 flex-1 py-1 px-2 rounded-xl transition-all">
@@ -214,7 +234,8 @@ tailwind.config = {
 <div id="modal-backdrop" class="fixed inset-0 bg-black/50 z-50 modal-backdrop opacity-0 pointer-events-none" onclick="closeTopModal()"></div>
 
 <!-- MODAL: Quick Add (Bottom Sheet) -->
-<div id="modal-quickAdd" class="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-lg bg-surface-container-lowest rounded-t-3xl z-60 bottom-sheet closed shadow-2xl" style="z-index:60; max-height:90vh; overflow-y:auto;">
+<!-- Centered with inset-x-0 + mx-auto and not translate-x, because the open/close animation overrides transform -->
+<div id="modal-quickAdd" class="fixed bottom-0 inset-x-0 mx-auto w-full max-w-lg bg-surface-container-lowest rounded-t-3xl z-60 bottom-sheet closed shadow-2xl sheet-scroll" style="z-index:60;">
   <div class="sticky top-0 bg-surface-container-lowest pt-3 pb-2 z-10">
     <div class="w-10 h-1 bg-outline-variant rounded-full mx-auto mb-3"></div>
     <div class="flex items-center justify-between px-4 pb-2 border-b border-outline-variant">
@@ -224,14 +245,14 @@ tailwind.config = {
       </button>
     </div>
   </div>
-  <div class="px-4 pb-8 pt-2" id="quick-add-content">
+  <div class="px-4 pt-2 sheet-body" id="quick-add-content">
     <!-- Rendered by JS -->
   </div>
 </div>
 
 <!-- MODAL: Edit Product -->
 <div id="modal-edit" class="fixed inset-0 flex items-end justify-center z-60 pointer-events-none" style="z-index:60;">
-  <div id="modal-edit-sheet" class="pointer-events-auto w-full max-w-lg bg-surface-container-lowest rounded-t-3xl bottom-sheet closed shadow-2xl" style="max-height:92vh; overflow-y:auto;">
+  <div id="modal-edit-sheet" class="pointer-events-auto w-full max-w-lg bg-surface-container-lowest rounded-t-3xl bottom-sheet closed shadow-2xl sheet-scroll">
     <div class="sticky top-0 bg-surface-container-lowest pt-3 pb-2 z-10">
       <div class="w-10 h-1 bg-outline-variant rounded-full mx-auto mb-3"></div>
       <div class="flex items-center justify-between px-4 pb-2 border-b border-outline-variant">
@@ -241,7 +262,7 @@ tailwind.config = {
         </button>
       </div>
     </div>
-    <div class="px-4 pb-8 pt-2" id="edit-modal-content">
+    <div class="px-4 pt-2 sheet-body" id="edit-modal-content">
       <!-- Rendered by JS -->
     </div>
   </div>
@@ -249,7 +270,7 @@ tailwind.config = {
 
 <!-- MODAL: Profile -->
 <div id="modal-profile" class="fixed inset-0 flex items-end justify-center z-60 pointer-events-none" style="z-index:60;">
-  <div id="modal-profile-sheet" class="pointer-events-auto w-full max-w-lg bg-surface-container-lowest rounded-t-3xl bottom-sheet closed shadow-2xl" style="max-height:85vh; overflow-y:auto;">
+  <div id="modal-profile-sheet" class="pointer-events-auto w-full max-w-lg bg-surface-container-lowest rounded-t-3xl bottom-sheet closed shadow-2xl sheet-scroll">
     <div class="sticky top-0 bg-surface-container-lowest pt-3 pb-2 z-10">
       <div class="w-10 h-1 bg-outline-variant rounded-full mx-auto mb-3"></div>
       <div class="flex items-center justify-between px-4 pb-2 border-b border-outline-variant">
@@ -259,7 +280,7 @@ tailwind.config = {
         </button>
       </div>
     </div>
-    <div class="px-4 pb-8 pt-2" id="profile-modal-content">
+    <div class="px-4 pt-2 sheet-body" id="profile-modal-content">
       <!-- Rendered by JS -->
     </div>
   </div>
@@ -267,7 +288,7 @@ tailwind.config = {
 
 <!-- MODAL: Notifications (simple) -->
 <div id="modal-notifications" class="fixed inset-0 flex items-end justify-center z-60 pointer-events-none" style="z-index:60;">
-  <div class="pointer-events-auto w-full max-w-lg bg-surface-container-lowest rounded-t-3xl bottom-sheet closed shadow-2xl" id="modal-notifications-sheet" style="max-height:60vh; overflow-y:auto;">
+  <div class="pointer-events-auto w-full max-w-lg bg-surface-container-lowest rounded-t-3xl bottom-sheet closed shadow-2xl sheet-scroll-sm" id="modal-notifications-sheet">
     <div class="sticky top-0 bg-surface-container-lowest pt-3 pb-2 z-10">
       <div class="w-10 h-1 bg-outline-variant rounded-full mx-auto mb-3"></div>
       <div class="flex items-center justify-between px-4 pb-2 border-b border-outline-variant">
@@ -287,16 +308,16 @@ tailwind.config = {
 </div>
 
 <!-- TOAST -->
-<div id="toast" class="fixed bottom-28 left-1/2 -translate-x-1/2 z-70 toast hidden" style="z-index:70; white-space:nowrap;">
-  <div class="bg-on-surface text-surface-container-lowest px-5 py-3 rounded-full shadow-lg text-body-md font-medium flex items-center gap-2">
-    <span class="material-symbols-outlined text-base" id="toast-icon">check_circle</span>
-    <span id="toast-msg">הפריט נוסף!</span>
+<div id="toast" class="fixed inset-x-0 z-70 flex justify-center px-4 pointer-events-none toast hidden" style="z-index:70; bottom: calc(7rem + env(safe-area-inset-bottom));">
+  <div class="max-w-full bg-on-surface text-surface-container-lowest px-5 py-3 rounded-3xl shadow-lg text-body-md font-medium flex items-center gap-2">
+    <span class="material-symbols-outlined text-base shrink-0" id="toast-icon">check_circle</span>
+    <span id="toast-msg" class="min-w-0">הפריט נוסף!</span>
   </div>
 </div>
 
 <!-- DELETE CONFIRM DIALOG -->
-<div id="delete-confirm" class="fixed inset-0 z-70 flex items-center justify-center pointer-events-none" style="z-index:70;">
-  <div class="pointer-events-auto bg-surface-container-lowest rounded-3xl p-6 mx-4 w-full max-w-sm shadow-2xl center-modal closed">
+<div id="delete-confirm" class="fixed inset-0 z-70 flex items-center justify-center px-4 pointer-events-none" style="z-index:70;">
+  <div class="pointer-events-auto bg-surface-container-lowest rounded-3xl p-6 w-full max-w-sm shadow-2xl center-modal closed">
     <div class="text-center mb-5">
       <div class="w-12 h-12 bg-status-empty-bg rounded-full flex items-center justify-center mx-auto mb-3">
         <span class="material-symbols-outlined text-status-empty-text">delete</span>
@@ -698,7 +719,7 @@ function renderInventoryScreen() {
 
     <!-- Status Filter Chips -->
     <div class="px-4 pb-2">
-      <div class="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+      <div class="chip-row flex gap-2 pb-1">
         ${statusChips.map(chip => `
           <button onclick="setInventoryFilter('status','${chip}')"
             class="filter-chip flex-shrink-0 px-3 py-1.5 rounded-full border border-outline-variant text-label-lg text-on-surface-variant bg-surface-container-lowest whitespace-nowrap transition-all active:scale-95 ${state.inventoryFilter.status === chip ? 'active' : ''}">
@@ -709,7 +730,7 @@ function renderInventoryScreen() {
 
     <!-- Category Filter -->
     <div class="px-4 pb-3">
-      <div class="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+      <div class="chip-row flex gap-2 pb-1">
         ${catChips.map(chip => `
           <button onclick="setInventoryFilter('category','${chip}')"
             class="filter-chip flex-shrink-0 px-3 py-1 rounded-full border border-outline-variant text-label-md text-on-surface-variant bg-surface-container-lowest whitespace-nowrap transition-all active:scale-95 ${state.inventoryFilter.category === chip ? 'active' : ''}">
@@ -757,7 +778,7 @@ function renderInventoryCard(item) {
             <span class="text-label-md text-on-surface-variant">כמות: ${item.quantity}</span>
           </div>
         </div>
-        <div class="flex flex-col items-end gap-2">
+        <div class="shrink-0 flex flex-col items-end gap-2">
           <!-- Status pill (tappable to cycle) -->
           <button onclick="event.stopPropagation(); cycleItemStatus('${item.id}')"
             class="${sc.bg} ${sc.text} px-3 py-1 rounded-full text-label-md font-bold border border-current/20 active:scale-95 transition-transform whitespace-nowrap">
@@ -1066,12 +1087,12 @@ function renderQuickAddForm() {
       <div class="mb-4">
         <label class="text-label-lg text-on-surface-variant mb-1.5 block">הוסף כמות</label>
         <div class="flex items-center gap-4">
-          <button onclick="qaStepQty(-1)" class="w-11 h-11 rounded-xl border-2 border-outline-variant flex items-center justify-center text-on-surface hover:border-primary active:scale-90 transition-all">
+          <button onclick="qaStepQty(-1)" class="shrink-0 w-11 h-11 rounded-xl border-2 border-outline-variant flex items-center justify-center text-on-surface hover:border-primary active:scale-90 transition-all">
             <span class="material-symbols-outlined">remove</span>
           </button>
           <input type="number" id="qa-qty" value="1" min="1"
             class="flex-1 bg-surface-container rounded-xl px-4 py-3 text-title-md font-bold text-center text-on-surface border border-outline-variant focus:outline-none focus:border-primary">
-          <button onclick="qaStepQty(1)" class="w-11 h-11 rounded-xl border-2 border-outline-variant flex items-center justify-center text-on-surface hover:border-primary active:scale-90 transition-all">
+          <button onclick="qaStepQty(1)" class="shrink-0 w-11 h-11 rounded-xl border-2 border-outline-variant flex items-center justify-center text-on-surface hover:border-primary active:scale-90 transition-all">
             <span class="material-symbols-outlined">add</span>
           </button>
         </div>
@@ -1087,12 +1108,12 @@ function renderQuickAddForm() {
       <div class="mb-4">
         <label class="text-label-lg text-on-surface-variant mb-1.5 block">כמות</label>
         <div class="flex items-center gap-4">
-          <button onclick="qaStepQty(-1)" class="w-11 h-11 rounded-xl border-2 border-outline-variant flex items-center justify-center text-on-surface hover:border-primary active:scale-90 transition-all">
+          <button onclick="qaStepQty(-1)" class="shrink-0 w-11 h-11 rounded-xl border-2 border-outline-variant flex items-center justify-center text-on-surface hover:border-primary active:scale-90 transition-all">
             <span class="material-symbols-outlined">remove</span>
           </button>
           <input type="number" id="qa-qty" value="1" min="1"
             class="flex-1 bg-surface-container rounded-xl px-4 py-3 text-title-md font-bold text-center text-on-surface border border-outline-variant focus:outline-none focus:border-primary">
-          <button onclick="qaStepQty(1)" class="w-11 h-11 rounded-xl border-2 border-outline-variant flex items-center justify-center text-on-surface hover:border-primary active:scale-90 transition-all">
+          <button onclick="qaStepQty(1)" class="shrink-0 w-11 h-11 rounded-xl border-2 border-outline-variant flex items-center justify-center text-on-surface hover:border-primary active:scale-90 transition-all">
             <span class="material-symbols-outlined">add</span>
           </button>
         </div>
@@ -1116,11 +1137,11 @@ function renderQuickAddForm() {
         <label class="text-label-lg text-on-surface-variant mb-1.5 block">מצב</label>
         <div class="flex gap-2">
           <button onclick="selectQAStatus('מלא')" id="qa-status-full"
-            class="status-btn flex-1 py-2.5 rounded-xl border border-outline-variant text-label-lg font-medium transition-all active:scale-95">מלא</button>
+            class="status-btn flex-1 px-1 whitespace-nowrap py-2.5 rounded-xl border border-outline-variant text-label-lg font-medium transition-all active:scale-95">מלא</button>
           <button onclick="selectQAStatus('חצי')" id="qa-status-half"
-            class="status-btn flex-1 py-2.5 rounded-xl border border-outline-variant text-label-lg font-medium transition-all active:scale-95">חצי</button>
+            class="status-btn flex-1 px-1 whitespace-nowrap py-2.5 rounded-xl border border-outline-variant text-label-lg font-medium transition-all active:scale-95">חצי</button>
           <button onclick="selectQAStatus('כמעט ריק')" id="qa-status-empty"
-            class="status-btn flex-1 py-2.5 rounded-xl border border-outline-variant text-label-lg font-medium transition-all active:scale-95">כמעט ריק</button>
+            class="status-btn flex-1 px-1 whitespace-nowrap py-2.5 rounded-xl border border-outline-variant text-label-lg font-medium transition-all active:scale-95">כמעט ריק</button>
         </div>
       </div>
 
@@ -1295,12 +1316,12 @@ function renderEditModal() {
     <div class="mb-4">
       <label class="text-label-lg text-on-surface-variant mb-1.5 block">כמות</label>
       <div class="flex items-center gap-4">
-        <button onclick="editStepQty(-1)" class="w-12 h-12 rounded-xl border-2 border-outline-variant flex items-center justify-center text-on-surface hover:border-primary active:scale-90 transition-all text-xl">
+        <button onclick="editStepQty(-1)" class="shrink-0 w-12 h-12 rounded-xl border-2 border-outline-variant flex items-center justify-center text-on-surface hover:border-primary active:scale-90 transition-all text-xl">
           <span class="material-symbols-outlined">remove</span>
         </button>
         <input type="number" id="edit-qty" value="${item.quantity}" min="0"
           class="flex-1 bg-surface-container rounded-xl px-4 py-3 text-headline-sm font-bold text-center text-on-surface border border-outline-variant focus:outline-none focus:border-primary">
-        <button onclick="editStepQty(1)" class="w-12 h-12 rounded-xl border-2 border-outline-variant flex items-center justify-center text-on-surface hover:border-primary active:scale-90 transition-all text-xl">
+        <button onclick="editStepQty(1)" class="shrink-0 w-12 h-12 rounded-xl border-2 border-outline-variant flex items-center justify-center text-on-surface hover:border-primary active:scale-90 transition-all text-xl">
           <span class="material-symbols-outlined">add</span>
         </button>
       </div>
@@ -1325,11 +1346,11 @@ function renderEditModal() {
       <label class="text-label-lg text-on-surface-variant mb-1.5 block">מצב המלאי</label>
       <div class="flex gap-2">
         <button onclick="selectEditStatus('מלא')" id="edit-status-full"
-          class="status-btn flex-1 py-3 rounded-xl border text-label-lg font-medium transition-all active:scale-95 ${item.status === 'מלא' ? 'active-full' : 'border-outline-variant bg-surface-container-lowest text-on-surface-variant'}">מלא</button>
+          class="status-btn flex-1 px-1 whitespace-nowrap py-3 rounded-xl border text-label-lg font-medium transition-all active:scale-95 ${item.status === 'מלא' ? 'active-full' : 'border-outline-variant bg-surface-container-lowest text-on-surface-variant'}">מלא</button>
         <button onclick="selectEditStatus('חצי')" id="edit-status-half"
-          class="status-btn flex-1 py-3 rounded-xl border text-label-lg font-medium transition-all active:scale-95 ${item.status === 'חצי' ? 'active-half' : 'border-outline-variant bg-surface-container-lowest text-on-surface-variant'}">חצי</button>
+          class="status-btn flex-1 px-1 whitespace-nowrap py-3 rounded-xl border text-label-lg font-medium transition-all active:scale-95 ${item.status === 'חצי' ? 'active-half' : 'border-outline-variant bg-surface-container-lowest text-on-surface-variant'}">חצי</button>
         <button onclick="selectEditStatus('כמעט ריק')" id="edit-status-empty"
-          class="status-btn flex-1 py-3 rounded-xl border text-label-lg font-medium transition-all active:scale-95 ${item.status === 'כמעט ריק' ? 'active-empty' : 'border-outline-variant bg-surface-container-lowest text-on-surface-variant'}">כמעט ריק</button>
+          class="status-btn flex-1 px-1 whitespace-nowrap py-3 rounded-xl border text-label-lg font-medium transition-all active:scale-95 ${item.status === 'כמעט ריק' ? 'active-empty' : 'border-outline-variant bg-surface-container-lowest text-on-surface-variant'}">כמעט ריק</button>
       </div>
     </div>
 
@@ -1479,13 +1500,13 @@ function renderProfileModal() {
     <!-- Household Card -->
     <div class="bg-gradient-to-l from-primary to-primary-container rounded-2xl p-5 mb-5 text-white">
       <div class="flex items-center gap-4">
-        <div class="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center text-2xl font-bold">
+        <div class="shrink-0 w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-white/20 flex items-center justify-center text-2xl font-bold">
           ${escapeHtml(hh.name.charAt(0))}
         </div>
-        <div>
-          <div class="text-title-lg font-bold">${escapeHtml(hh.name)}</div>
-          <div class="text-body-sm opacity-80">${escapeHtml(user.email)}</div>
-          <div class="mt-1 inline-flex items-center gap-1 bg-white/20 px-2 py-0.5 rounded-full text-label-sm">
+        <div class="min-w-0 flex-1">
+          <div class="text-title-lg font-bold truncate">${escapeHtml(hh.name)}</div>
+          <div class="text-body-sm opacity-80 truncate" dir="ltr" style="text-align:right">${escapeHtml(user.email)}</div>
+          <div class="mt-1 inline-flex flex-wrap items-center gap-1 max-w-full bg-white/20 px-2 py-0.5 rounded-full text-label-sm">
             <span class="material-symbols-outlined" style="font-size:12px">key</span>
             קוד הזמנה: <b dir="ltr">${escapeHtml(hh.invite_code || '')}</b>
           </div>
@@ -1494,16 +1515,16 @@ function renderProfileModal() {
     </div>
 
     <!-- Stats -->
-    <div class="grid grid-cols-3 gap-3 mb-5">
-      <div class="bg-surface-container rounded-xl p-3 text-center">
+    <div class="grid grid-cols-3 gap-2 sm:gap-3 mb-5">
+      <div class="min-w-0 bg-surface-container rounded-xl px-2 py-3 sm:p-3 text-center">
         <div class="text-headline-sm font-bold text-primary">${state.inventoryList.length}</div>
         <div class="text-label-sm text-on-surface-variant">פריטי מלאי</div>
       </div>
-      <div class="bg-surface-container rounded-xl p-3 text-center">
+      <div class="min-w-0 bg-surface-container rounded-xl px-2 py-3 sm:p-3 text-center">
         <div class="text-headline-sm font-bold text-primary">${state.shoppingList.filter(s=>!s.isCompleted).length}</div>
         <div class="text-label-sm text-on-surface-variant">לקנייה</div>
       </div>
-      <div class="bg-surface-container rounded-xl p-3 text-center">
+      <div class="min-w-0 bg-surface-container rounded-xl px-2 py-3 sm:p-3 text-center">
         <div class="text-headline-sm font-bold text-status-empty-text">${state.inventoryList.filter(i=>i.status==='כמעט ריק').length}</div>
         <div class="text-label-sm text-on-surface-variant">כמעט ריקים</div>
       </div>
@@ -1515,14 +1536,14 @@ function renderProfileModal() {
       <div class="flex flex-col gap-2">
         ${state.familyMembers.map(m => `
           <div class="flex items-center gap-3 bg-surface-container rounded-xl px-4 py-3">
-            <div class="w-10 h-10 rounded-full bg-secondary-container flex items-center justify-center text-primary font-bold">
+            <div class="shrink-0 w-10 h-10 rounded-full bg-secondary-container flex items-center justify-center text-primary font-bold">
               ${escapeHtml(m.avatar)}
             </div>
             <div class="flex-1">
-              <div class="text-body-lg font-medium text-on-surface">${escapeHtml(m.name)}</div>
+              <div class="text-body-lg font-medium text-on-surface truncate">${escapeHtml(m.name)}</div>
               <div class="text-label-md text-on-surface-variant">${escapeHtml(m.role)}</div>
             </div>
-            <span class="material-symbols-outlined text-on-surface-variant opacity-40">chevron_left</span>
+            <span class="shrink-0 material-symbols-outlined text-on-surface-variant opacity-40">chevron_left</span>
           </div>`).join('')}
         <button onclick="inviteFamilyMember()" class="flex items-center gap-3 bg-surface-container rounded-xl px-4 py-3 border-2 border-dashed border-outline-variant text-on-surface-variant active:scale-95 transition-transform w-full">
           <div class="w-10 h-10 rounded-full bg-surface-container-lowest border-2 border-dashed border-outline-variant flex items-center justify-center">
