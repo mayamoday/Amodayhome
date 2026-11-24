@@ -960,25 +960,49 @@ function shopQuickAdd() {
   showToast(`${name} נוסף לרשימה!`, 'shopping_cart');
 }
 
-function toggleShoppingItem(id, checked) {
+async function toggleShoppingItem(id, checked) {
   const item = state.shoppingList.find(s => s.id === id);
   if (!item) return;
   item.isCompleted = checked;
-  dbSaveShopping(item);
 
-  // Sync inventory if linked
-  if (checked && item.inventoryItemId) {
-    const invItem = state.inventoryList.find(i => i.id === item.inventoryItemId);
-    if (invItem) {
-      const before = { ...invItem };
-      invItem.quantity += item.requestedQuantity;
-      invItem.status = statusFromQuantity(invItem.quantity);
-      invItem.lastUpdated = new Date().toISOString();
-      dbSaveInventory(invItem).then(() => dbLogHistory(invItem.id, 'restocked', before, invItem, item.id));
-      showToast(`${invItem.name} עודכן במלאי!`, 'sync');
-    }
-  } else if (checked) {
-    showToast(`${item.name} סומן כנרכש`, 'check_circle');
+  if (!checked) {
+    dbSaveShopping(item);
+    setTimeout(() => renderActiveTab(), 300);
+    return;
+  }
+
+  // Find the matching inventory item: by link, otherwise by name
+  const normName = s => (s || '').trim().toLowerCase();
+  let invItem = state.inventoryList.find(i => i.id === item.inventoryItemId)
+    || state.inventoryList.find(i => normName(i.name) === normName(item.name));
+
+  if (invItem) {
+    const before = { ...invItem };
+    invItem.quantity += item.requestedQuantity;
+    invItem.status = statusFromQuantity(invItem.quantity);
+    invItem.lastUpdated = new Date().toISOString();
+    item.inventoryItemId = invItem.id;
+    dbSaveShopping(item);
+    dbSaveInventory(invItem).then(() => dbLogHistory(invItem.id, 'restocked', before, invItem, item.id));
+    showToast(`${invItem.name} עודכן במלאי!`, 'sync');
+  } else {
+    // The product isn't in inventory yet: create it in the "כללי" category (can be changed later from the edit screen)
+    invItem = {
+      id: genId(),
+      name: item.name.trim(),
+      quantity: item.requestedQuantity,
+      status: statusFromQuantity(item.requestedQuantity),
+      category: 'כללי',
+      notes: '',
+      lastUpdated: new Date().toISOString(),
+    };
+    state.inventoryList.unshift(invItem);
+    item.inventoryItemId = invItem.id;
+    // The inventory item has to exist in the database before the shopping item links to it
+    await dbSaveInventory(invItem, true);
+    dbSaveShopping(item);
+    dbLogHistory(invItem.id, 'created', null, invItem, item.id);
+    showToast(`${invItem.name} נוסף למלאי!`, 'add_circle');
   }
 
   setTimeout(() => renderActiveTab(), 300);
