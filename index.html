@@ -1,0 +1,1403 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>בית המשפחה אמודאי</title>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  darkMode: "class",
+  theme: {
+    extend: {
+      colors: {
+        primary: "#005c55",
+        "primary-container": "#0f766e",
+        "on-primary": "#ffffff",
+        surface: "#f7f9fb",
+        "surface-container-lowest": "#ffffff",
+        "surface-container": "#eef1f4",
+        "on-surface": "#1a1c1e",
+        "on-surface-variant": "#42474e",
+        outline: "#72787e",
+        "outline-variant": "#c2c7ce",
+        error: "#ba1a1a",
+        secondary: "#006a61",
+        "secondary-container": "#86f2e4",
+        tertiary: "#475266",
+        "status-full-bg": "#DCFCE7",
+        "status-full-text": "#15803D",
+        "status-half-bg": "#FEF3C7",
+        "status-half-text": "#B45309",
+        "status-empty-bg": "#FEE2E2",
+        "status-empty-text": "#B91C1C",
+      },
+      borderRadius: {
+        DEFAULT: "0.25rem",
+        sm: "0.25rem",
+        md: "0.5rem",
+        lg: "0.5rem",
+        xl: "0.75rem",
+        "2xl": "1rem",
+        "3xl": "1.5rem",
+        full: "9999px",
+      },
+      fontFamily: {
+        sans: ["Heebo", "sans-serif"],
+        heebo: ["Heebo", "sans-serif"],
+      },
+      fontSize: {
+        "label-sm": ["10px", { lineHeight: "14px", fontWeight: "700" }],
+        "label-md": ["12px", { lineHeight: "16px", fontWeight: "500" }],
+        "label-lg": ["14px", { lineHeight: "20px", fontWeight: "500" }],
+        "body-sm": ["12px", { lineHeight: "16px", fontWeight: "400" }],
+        "body-md": ["14px", { lineHeight: "20px", fontWeight: "400" }],
+        "body-lg": ["16px", { lineHeight: "24px", fontWeight: "400" }],
+        "title-sm": ["14px", { lineHeight: "20px", fontWeight: "500" }],
+        "title-md": ["16px", { lineHeight: "24px", fontWeight: "500" }],
+        "title-lg": ["22px", { lineHeight: "28px", fontWeight: "700" }],
+        "headline-sm": ["24px", { lineHeight: "32px", fontWeight: "700" }],
+        "headline-md": ["28px", { lineHeight: "36px", fontWeight: "700" }],
+        "headline-lg": ["30px", { lineHeight: "40px", fontWeight: "700" }],
+      },
+    },
+  },
+};
+</script>
+<style>
+  * { font-family: 'Heebo', sans-serif; }
+  .material-symbols-outlined {
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    user-select: none;
+    vertical-align: middle;
+  }
+  .material-symbols-outlined.filled {
+    font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  }
+  body { background: #f7f9fb; overscroll-behavior: none; }
+  .safe-bottom { padding-bottom: max(1rem, env(safe-area-inset-bottom)); }
+  .bottom-safe { bottom: max(0px, env(safe-area-inset-bottom)); }
+
+  /* Modal animations */
+  .modal-backdrop { transition: opacity 0.25s ease; }
+  .bottom-sheet { transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1); }
+  .bottom-sheet.closed { transform: translateY(100%); }
+  .bottom-sheet.open { transform: translateY(0); }
+  .center-modal { transition: opacity 0.2s ease, transform 0.2s ease; }
+  .center-modal.closed { opacity: 0; transform: scale(0.95); }
+  .center-modal.open { opacity: 1; transform: scale(1); }
+
+  /* Toast */
+  .toast { transition: opacity 0.3s ease, transform 0.3s ease; }
+  .toast.hidden { opacity: 0; transform: translateY(2rem); pointer-events: none; }
+  .toast.show { opacity: 1; transform: translateY(0); }
+
+  /* Chip active */
+  .filter-chip.active {
+    background: #005c55;
+    color: white;
+    border-color: #005c55;
+  }
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-thumb { background: #c2c7ce; border-radius: 9999px; }
+
+  /* Autocomplete */
+  #autocomplete-dropdown { z-index: 100; }
+
+  /* Status buttons */
+  .status-btn { transition: all 0.15s ease; }
+  .status-btn.active-full { background: #DCFCE7; color: #15803D; border-color: #15803D; }
+  .status-btn.active-half { background: #FEF3C7; color: #B45309; border-color: #B45309; }
+  .status-btn.active-empty { background: #FEE2E2; color: #B91C1C; border-color: #B91C1C; }
+
+  input[type=number]::-webkit-inner-spin-button,
+  input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
+
+  .inventory-card { transition: transform 0.1s ease, box-shadow 0.1s ease; }
+  .inventory-card:active { transform: scale(0.985); }
+
+  .shopping-item { transition: background 0.2s ease; }
+  .shopping-item.completing { background: #DCFCE7; }
+
+  /* Checkbox custom */
+  .custom-checkbox {
+    appearance: none;
+    width: 22px;
+    height: 22px;
+    border: 2px solid #72787e;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+    position: relative;
+  }
+  .custom-checkbox:checked {
+    background: #005c55;
+    border-color: #005c55;
+  }
+  .custom-checkbox:checked::after {
+    content: '';
+    position: absolute;
+    left: 5px;
+    top: 2px;
+    width: 8px;
+    height: 12px;
+    border: 2px solid white;
+    border-top: none;
+    border-left: none;
+    transform: rotate(45deg);
+  }
+</style>
+</head>
+<body class="bg-surface min-h-screen">
+
+<!-- App Container -->
+<div class="max-w-lg mx-auto relative min-h-screen flex flex-col bg-surface-container-lowest shadow-xl" id="app">
+
+  <!-- TOP APP BAR -->
+  <header class="bg-surface-container-lowest border-b border-outline-variant px-4 pt-safe" style="padding-top: max(0.75rem, env(safe-area-inset-top));">
+    <div class="flex items-center justify-between h-14">
+      <button onclick="openModal('profile')" class="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white font-bold text-lg shadow-sm active:scale-95 transition-transform">
+        <span id="user-avatar-initials">א</span>
+      </button>
+      <div class="text-center">
+        <div class="text-title-md font-bold text-on-surface" id="header-title">מלאי הבית</div>
+        <div class="text-label-md text-on-surface-variant" id="header-subtitle">משפחת אמודאי</div>
+      </div>
+      <button onclick="openModal('notifications')" class="w-10 h-10 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container active:scale-95 transition-transform relative">
+        <span class="material-symbols-outlined">notifications</span>
+        <span id="notif-badge" class="absolute top-1 right-1 w-2 h-2 bg-error rounded-full hidden"></span>
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN CONTENT AREA -->
+  <main class="flex-1 overflow-y-auto pb-24" id="main-content">
+    <!-- Screens rendered here -->
+  </main>
+
+  <!-- BOTTOM NAV -->
+  <nav class="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-lg bg-surface-container-lowest border-t border-outline-variant safe-bottom z-40">
+    <div class="flex items-end justify-around px-2 pt-2 pb-2 relative">
+      <!-- Inventory Tab -->
+      <button onclick="switchTab('inventory')" id="tab-inventory" class="flex flex-col items-center gap-1 flex-1 py-1 px-2 rounded-xl transition-all">
+        <span class="material-symbols-outlined text-2xl" id="icon-inventory">kitchen</span>
+        <span class="text-label-sm" id="label-inventory">מלאי</span>
+      </button>
+
+      <!-- FAB Spacer -->
+      <div class="flex-1"></div>
+
+      <!-- Shopping Tab -->
+      <button onclick="switchTab('shopping')" id="tab-shopping" class="flex flex-col items-center gap-1 flex-1 py-1 px-2 rounded-xl transition-all">
+        <span class="material-symbols-outlined text-2xl" id="icon-shopping">shopping_cart</span>
+        <span class="text-label-sm" id="label-shopping">רשימת קניות</span>
+      </button>
+
+      <!-- FAB (center, raised) -->
+      <button onclick="openModal('quickAdd')" class="absolute -top-6 left-1/2 -translate-x-1/2 w-14 h-14 rounded-full bg-primary text-white shadow-lg flex items-center justify-center active:scale-95 transition-transform z-50 border-4 border-surface-container-lowest">
+        <span class="material-symbols-outlined text-2xl">add</span>
+      </button>
+    </div>
+  </nav>
+</div>
+
+<!-- ============================================================
+     MODALS
+     ============================================================ -->
+
+<!-- BACKDROP -->
+<div id="modal-backdrop" class="fixed inset-0 bg-black/50 z-50 modal-backdrop opacity-0 pointer-events-none" onclick="closeTopModal()"></div>
+
+<!-- MODAL: Quick Add (Bottom Sheet) -->
+<div id="modal-quickAdd" class="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-lg bg-surface-container-lowest rounded-t-3xl z-60 bottom-sheet closed shadow-2xl" style="z-index:60; max-height:90vh; overflow-y:auto;">
+  <div class="sticky top-0 bg-surface-container-lowest pt-3 pb-2 z-10">
+    <div class="w-10 h-1 bg-outline-variant rounded-full mx-auto mb-3"></div>
+    <div class="flex items-center justify-between px-4 pb-2 border-b border-outline-variant">
+      <h2 class="text-title-lg text-on-surface">הוסף פריט</h2>
+      <button onclick="closeModal('quickAdd')" class="w-9 h-9 rounded-full flex items-center justify-center hover:bg-surface-container text-on-surface-variant active:scale-95 transition-transform">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+  </div>
+  <div class="px-4 pb-8 pt-2" id="quick-add-content">
+    <!-- Rendered by JS -->
+  </div>
+</div>
+
+<!-- MODAL: Edit Product -->
+<div id="modal-edit" class="fixed inset-0 flex items-end justify-center z-60 pointer-events-none" style="z-index:60;">
+  <div id="modal-edit-sheet" class="pointer-events-auto w-full max-w-lg bg-surface-container-lowest rounded-t-3xl bottom-sheet closed shadow-2xl" style="max-height:92vh; overflow-y:auto;">
+    <div class="sticky top-0 bg-surface-container-lowest pt-3 pb-2 z-10">
+      <div class="w-10 h-1 bg-outline-variant rounded-full mx-auto mb-3"></div>
+      <div class="flex items-center justify-between px-4 pb-2 border-b border-outline-variant">
+        <h2 class="text-title-lg text-on-surface">עריכת פריט</h2>
+        <button onclick="closeModal('edit')" class="w-9 h-9 rounded-full flex items-center justify-center hover:bg-surface-container text-on-surface-variant active:scale-95 transition-transform">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+    </div>
+    <div class="px-4 pb-8 pt-2" id="edit-modal-content">
+      <!-- Rendered by JS -->
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Profile -->
+<div id="modal-profile" class="fixed inset-0 flex items-end justify-center z-60 pointer-events-none" style="z-index:60;">
+  <div id="modal-profile-sheet" class="pointer-events-auto w-full max-w-lg bg-surface-container-lowest rounded-t-3xl bottom-sheet closed shadow-2xl" style="max-height:85vh; overflow-y:auto;">
+    <div class="sticky top-0 bg-surface-container-lowest pt-3 pb-2 z-10">
+      <div class="w-10 h-1 bg-outline-variant rounded-full mx-auto mb-3"></div>
+      <div class="flex items-center justify-between px-4 pb-2 border-b border-outline-variant">
+        <h2 class="text-title-lg text-on-surface">פרופיל משפחה</h2>
+        <button onclick="closeModal('profile')" class="w-9 h-9 rounded-full flex items-center justify-center hover:bg-surface-container text-on-surface-variant active:scale-95 transition-transform">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+    </div>
+    <div class="px-4 pb-8 pt-2" id="profile-modal-content">
+      <!-- Rendered by JS -->
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Notifications (simple) -->
+<div id="modal-notifications" class="fixed inset-0 flex items-end justify-center z-60 pointer-events-none" style="z-index:60;">
+  <div class="pointer-events-auto w-full max-w-lg bg-surface-container-lowest rounded-t-3xl bottom-sheet closed shadow-2xl" id="modal-notifications-sheet" style="max-height:60vh; overflow-y:auto;">
+    <div class="sticky top-0 bg-surface-container-lowest pt-3 pb-2 z-10">
+      <div class="w-10 h-1 bg-outline-variant rounded-full mx-auto mb-3"></div>
+      <div class="flex items-center justify-between px-4 pb-2 border-b border-outline-variant">
+        <h2 class="text-title-lg text-on-surface">התראות</h2>
+        <button onclick="closeModal('notifications')" class="w-9 h-9 rounded-full flex items-center justify-center hover:bg-surface-container text-on-surface-variant active:scale-95 transition-transform">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+    </div>
+    <div class="px-4 pb-8 pt-4" id="notifications-content">
+      <div class="text-center py-8 text-on-surface-variant">
+        <span class="material-symbols-outlined text-5xl mb-3 block opacity-40">notifications_off</span>
+        <p class="text-body-lg">אין התראות חדשות</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast" class="fixed bottom-28 left-1/2 -translate-x-1/2 z-70 toast hidden" style="z-index:70; white-space:nowrap;">
+  <div class="bg-on-surface text-surface-container-lowest px-5 py-3 rounded-full shadow-lg text-body-md font-medium flex items-center gap-2">
+    <span class="material-symbols-outlined text-base" id="toast-icon">check_circle</span>
+    <span id="toast-msg">הפריט נוסף!</span>
+  </div>
+</div>
+
+<!-- DELETE CONFIRM DIALOG -->
+<div id="delete-confirm" class="fixed inset-0 z-70 flex items-center justify-center pointer-events-none" style="z-index:70;">
+  <div class="pointer-events-auto bg-surface-container-lowest rounded-3xl p-6 mx-4 w-full max-w-sm shadow-2xl center-modal closed">
+    <div class="text-center mb-5">
+      <div class="w-12 h-12 bg-status-empty-bg rounded-full flex items-center justify-center mx-auto mb-3">
+        <span class="material-symbols-outlined text-status-empty-text">delete</span>
+      </div>
+      <h3 class="text-title-lg text-on-surface mb-1">מחיקת פריט</h3>
+      <p class="text-body-md text-on-surface-variant" id="delete-confirm-msg">האם למחוק את הפריט?</p>
+    </div>
+    <div class="flex gap-3">
+      <button onclick="cancelDelete()" class="flex-1 py-3 rounded-xl border border-outline-variant text-on-surface font-medium text-body-lg active:scale-95 transition-transform">ביטול</button>
+      <button onclick="confirmDelete()" class="flex-1 py-3 rounded-xl bg-error text-white font-medium text-body-lg active:scale-95 transition-transform">מחק</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// STATE
+// ============================================================
+const state = {
+  currentTab: 'inventory',
+  openModals: [],
+  inventoryList: [
+    { id: 'i1', name: 'חלב 3%', quantity: 2, status: 'חצי', category: 'מקרר', lastUpdated: new Date().toISOString() },
+    { id: 'i2', name: 'גבינה צהובה', quantity: 1, status: 'כמעט ריק', category: 'מקרר', lastUpdated: new Date().toISOString() },
+    { id: 'i3', name: 'נייר טואלט', quantity: 6, status: 'מלא', category: 'חומרי ניקוי', lastUpdated: new Date().toISOString() },
+    { id: 'i4', name: 'תירס קפוא', quantity: 2, status: 'מלא', category: 'קפאון', lastUpdated: new Date().toISOString() },
+    { id: 'i5', name: 'ביצים', quantity: 12, status: 'מלא', category: 'מקרר', lastUpdated: new Date().toISOString() },
+    { id: 'i6', name: 'לחם', quantity: 1, status: 'חצי', category: 'מזווה', lastUpdated: new Date().toISOString() },
+    { id: 'i7', name: 'שמן זית', quantity: 1, status: 'כמעט ריק', category: 'מזווה', lastUpdated: new Date().toISOString() },
+  ],
+  shoppingList: [
+    { id: 's1', inventoryItemId: null, name: 'עגבניות', requestedQuantity: 3, note: 'רק צרור', addedBy: 'רוני', addedAt: new Date().toISOString(), isCompleted: false },
+    { id: 's2', inventoryItemId: 'i1', name: 'חלב פרימה', requestedQuantity: 2, note: 'מחלב מלא', addedBy: 'יואב', addedAt: new Date().toISOString(), isCompleted: false },
+    { id: 's3', inventoryItemId: null, name: 'פיתות', requestedQuantity: 2, note: '', addedBy: 'שרה', addedAt: new Date().toISOString(), isCompleted: true },
+  ],
+  currentUser: { id: 'u1', name: 'משפחת אמודאי', email: 'family@amoday.com', isLoggedIn: true },
+  familyMembers: [
+    { id: 'm1', name: 'יואב', role: 'אבא', avatar: 'י' },
+    { id: 'm2', name: 'רוני', role: 'אמא', avatar: 'ר' },
+    { id: 'm3', name: 'שרה', role: 'ילד/ה', avatar: 'ש' },
+  ],
+  inventoryFilter: { search: '', status: 'הכל', category: 'הכל' },
+  editingItemId: null,
+  deletingItemId: null,
+  quickAddMode: 'new', // 'new' | 'existing'
+  quickAddSelectedItem: null,
+};
+
+// ============================================================
+// UTILS
+// ============================================================
+function genId() { return '_' + Math.random().toString(36).substr(2, 9); }
+
+function statusConfig(s) {
+  if (s === 'מלא') return { bg: 'bg-status-full-bg', text: 'text-status-full-text', label: 'מלא' };
+  if (s === 'חצי') return { bg: 'bg-status-half-bg', text: 'text-status-half-text', label: 'חצי' };
+  return { bg: 'bg-status-empty-bg', text: 'text-status-empty-text', label: 'כמעט ריק' };
+}
+
+function cycleStatus(current) {
+  const order = ['מלא', 'חצי', 'כמעט ריק'];
+  return order[(order.indexOf(current) + 1) % 3];
+}
+
+function categoryIcon(cat) {
+  const map = { 'מקרר': 'kitchen', 'מזווה': 'shelves', 'חומרי ניקוי': 'cleaning_services', 'קפאון': 'ac_unit', 'כללי': 'category' };
+  return map[cat] || 'category';
+}
+
+let toastTimer = null;
+function showToast(msg, icon = 'check_circle') {
+  const t = document.getElementById('toast');
+  document.getElementById('toast-msg').textContent = msg;
+  document.getElementById('toast-icon').textContent = icon;
+  t.classList.remove('hidden');
+  t.classList.add('show');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    t.classList.remove('show');
+    t.classList.add('hidden');
+  }, 2800);
+}
+
+// ============================================================
+// NAVIGATION
+// ============================================================
+function switchTab(tab) {
+  state.currentTab = tab;
+  renderActiveTab();
+  updateNavBar();
+}
+
+function updateNavBar() {
+  const tabs = ['inventory', 'shopping'];
+  tabs.forEach(t => {
+    const btn = document.getElementById('tab-' + t);
+    const icon = document.getElementById('icon-' + t);
+    const label = document.getElementById('label-' + t);
+    if (t === state.currentTab) {
+      btn.classList.add('text-primary');
+      btn.classList.remove('text-on-surface-variant');
+      icon.classList.add('filled', 'text-primary');
+      icon.classList.remove('text-on-surface-variant');
+      label.classList.add('font-bold', 'text-primary');
+    } else {
+      btn.classList.remove('text-primary');
+      btn.classList.add('text-on-surface-variant');
+      icon.classList.remove('filled', 'text-primary');
+      icon.classList.add('text-on-surface-variant');
+      label.classList.remove('font-bold', 'text-primary');
+    }
+  });
+}
+
+function renderActiveTab() {
+  const main = document.getElementById('main-content');
+  if (state.currentTab === 'inventory') {
+    main.innerHTML = renderInventoryScreen();
+    attachInventoryListeners();
+  } else {
+    main.innerHTML = renderShoppingScreen();
+    attachShoppingListeners();
+  }
+}
+
+// ============================================================
+// MODAL SYSTEM
+// ============================================================
+function openModal(name) {
+  if (state.openModals.includes(name)) return;
+  state.openModals.push(name);
+  renderModal(name);
+
+  const backdrop = document.getElementById('modal-backdrop');
+  backdrop.classList.remove('pointer-events-none', 'opacity-0');
+  backdrop.classList.add('opacity-100');
+
+  const sheet = getModalSheet(name);
+  if (sheet) {
+    requestAnimationFrame(() => {
+      sheet.classList.remove('closed');
+      sheet.classList.add('open');
+    });
+  }
+}
+
+function closeModal(name) {
+  const idx = state.openModals.indexOf(name);
+  if (idx === -1) return;
+  state.openModals.splice(idx, 1);
+
+  const sheet = getModalSheet(name);
+  if (sheet) {
+    sheet.classList.add('closed');
+    sheet.classList.remove('open');
+  }
+
+  if (state.openModals.length === 0) {
+    const backdrop = document.getElementById('modal-backdrop');
+    backdrop.classList.add('pointer-events-none', 'opacity-0');
+    backdrop.classList.remove('opacity-100');
+  }
+}
+
+function closeTopModal() {
+  if (state.openModals.length > 0) {
+    closeModal(state.openModals[state.openModals.length - 1]);
+  }
+}
+
+function getModalSheet(name) {
+  const map = {
+    quickAdd: document.getElementById('modal-quickAdd'),
+    edit: document.getElementById('modal-edit-sheet'),
+    profile: document.getElementById('modal-profile-sheet'),
+    notifications: document.getElementById('modal-notifications-sheet'),
+  };
+  return map[name];
+}
+
+function renderModal(name) {
+  if (name === 'quickAdd') renderQuickAddModal();
+  if (name === 'edit') renderEditModal();
+  if (name === 'profile') renderProfileModal();
+}
+
+// ============================================================
+// SCREEN 1: INVENTORY
+// ============================================================
+function renderInventoryScreen() {
+  const { search, status: statusFilter, category: catFilter } = state.inventoryFilter;
+
+  let items = state.inventoryList.filter(item => {
+    const matchSearch = !search || item.name.includes(search);
+    const matchStatus = statusFilter === 'הכל' || item.status === statusFilter;
+    const matchCat = catFilter === 'הכל' || item.category === catFilter;
+    return matchSearch && matchStatus && matchCat;
+  });
+
+  const statusChips = ['הכל', 'מלא', 'חצי', 'כמעט ריק'];
+  const catChips = ['הכל', 'מקרר', 'מזווה', 'חומרי ניקוי', 'קפאון', 'כללי'];
+
+  return `
+    <!-- Search -->
+    <div class="px-4 pt-4 pb-2">
+      <div class="relative">
+        <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-xl pointer-events-none">search</span>
+        <input type="text" id="inv-search" placeholder="חיפוש פריט..." value="${escapeHtml(search)}"
+          class="w-full bg-surface-container rounded-xl pr-10 pl-4 py-3 text-body-lg text-on-surface placeholder:text-on-surface-variant border border-outline-variant focus:outline-none focus:border-primary transition-colors"
+          oninput="onInventorySearch(this.value)">
+      </div>
+    </div>
+
+    <!-- Status Filter Chips -->
+    <div class="px-4 pb-2">
+      <div class="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+        ${statusChips.map(chip => `
+          <button onclick="setInventoryFilter('status','${chip}')"
+            class="filter-chip flex-shrink-0 px-3 py-1.5 rounded-full border border-outline-variant text-label-lg text-on-surface-variant bg-surface-container-lowest whitespace-nowrap transition-all active:scale-95 ${state.inventoryFilter.status === chip ? 'active' : ''}">
+            ${chip}
+          </button>`).join('')}
+      </div>
+    </div>
+
+    <!-- Category Filter -->
+    <div class="px-4 pb-3">
+      <div class="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+        ${catChips.map(chip => `
+          <button onclick="setInventoryFilter('category','${chip}')"
+            class="filter-chip flex-shrink-0 px-3 py-1 rounded-full border border-outline-variant text-label-md text-on-surface-variant bg-surface-container-lowest whitespace-nowrap transition-all active:scale-95 ${state.inventoryFilter.category === chip ? 'active' : ''}">
+            <span class="material-symbols-outlined text-xs align-middle" style="font-size:14px">${chip === 'הכל' ? 'apps' : categoryIcon(chip)}</span>
+            ${chip}
+          </button>`).join('')}
+      </div>
+    </div>
+
+    <!-- Items Count -->
+    <div class="px-4 pb-2 flex items-center justify-between">
+      <span class="text-label-lg text-on-surface-variant">${items.length} פריטים</span>
+      ${items.some(i => i.status === 'כמעט ריק') ? `
+        <span class="text-label-md text-status-empty-text flex items-center gap-1">
+          <span class="material-symbols-outlined text-sm">warning</span>
+          ${items.filter(i => i.status === 'כמעט ריק').length} כמעט ריקים
+        </span>` : ''}
+    </div>
+
+    <!-- Items List -->
+    <div class="px-4 flex flex-col gap-3 pb-4">
+      ${items.length === 0 ? renderInventoryEmpty() : items.map(item => renderInventoryCard(item)).join('')}
+    </div>
+  `;
+}
+
+function renderInventoryCard(item) {
+  const sc = statusConfig(item.status);
+  const isInCart = state.shoppingList.some(s => !s.isCompleted && (s.inventoryItemId === item.id || s.name === item.name));
+  return `
+    <div class="inventory-card bg-surface-container-lowest rounded-2xl p-4 shadow-sm border border-outline-variant cursor-pointer"
+         onclick="openEditFromCard('${item.id}')">
+      <div class="flex items-start justify-between gap-2">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-title-md font-bold text-on-surface truncate">${escapeHtml(item.name)}</span>
+          </div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <!-- Category tag -->
+            <span class="flex items-center gap-1 text-label-sm text-on-surface-variant bg-surface-container px-2 py-0.5 rounded-full">
+              <span class="material-symbols-outlined" style="font-size:12px">${categoryIcon(item.category)}</span>
+              ${item.category}
+            </span>
+            <!-- Quantity -->
+            <span class="text-label-md text-on-surface-variant">כמות: ${item.quantity}</span>
+          </div>
+        </div>
+        <div class="flex flex-col items-end gap-2">
+          <!-- Status pill (tappable to cycle) -->
+          <button onclick="event.stopPropagation(); cycleItemStatus('${item.id}')"
+            class="${sc.bg} ${sc.text} px-3 py-1 rounded-full text-label-md font-bold border border-current/20 active:scale-95 transition-transform whitespace-nowrap">
+            ${item.status}
+          </button>
+          <!-- Cart button -->
+          <button onclick="event.stopPropagation(); quickAddToCart('${item.id}')"
+            class="w-8 h-8 rounded-full flex items-center justify-center transition-all active:scale-90 ${isInCart ? 'bg-primary text-white' : 'bg-surface-container text-on-surface-variant hover:bg-primary/10'}">
+            <span class="material-symbols-outlined ${isInCart ? 'filled' : ''}" style="font-size:18px">shopping_cart</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderInventoryEmpty() {
+  return `
+    <div class="text-center py-16 text-on-surface-variant">
+      <span class="material-symbols-outlined text-6xl mb-4 block opacity-30">inventory_2</span>
+      <p class="text-title-md font-medium mb-1">לא נמצאו פריטים</p>
+      <p class="text-body-md opacity-70">נסה לשנות את הפילטר או הוסף פריט חדש</p>
+    </div>
+  `;
+}
+
+function attachInventoryListeners() {
+  // already using inline onclick
+}
+
+function onInventorySearch(val) {
+  state.inventoryFilter.search = val;
+  reRenderInventoryList();
+}
+
+function setInventoryFilter(key, val) {
+  state.inventoryFilter[key] = val;
+  if (state.currentTab === 'inventory') renderActiveTab();
+}
+
+function reRenderInventoryList() {
+  if (state.currentTab === 'inventory') renderActiveTab();
+}
+
+function cycleItemStatus(id) {
+  const item = state.inventoryList.find(i => i.id === id);
+  if (!item) return;
+  item.status = cycleStatus(item.status);
+  item.lastUpdated = new Date().toISOString();
+  renderActiveTab();
+  showToast(`${item.name}: ${item.status}`, 'sync');
+}
+
+function quickAddToCart(itemId) {
+  const item = state.inventoryList.find(i => i.id === itemId);
+  if (!item) return;
+  const existing = state.shoppingList.find(s => !s.isCompleted && (s.inventoryItemId === itemId || s.name === item.name));
+  if (existing) {
+    // Remove from cart
+    state.shoppingList = state.shoppingList.filter(s => s.id !== existing.id);
+    renderActiveTab();
+    showToast(`${item.name} הוסר מהרשימה`, 'remove_shopping_cart');
+  } else {
+    state.shoppingList.unshift({
+      id: genId(),
+      inventoryItemId: itemId,
+      name: item.name,
+      requestedQuantity: 1,
+      note: '',
+      addedBy: 'אני',
+      addedAt: new Date().toISOString(),
+      isCompleted: false,
+    });
+    renderActiveTab();
+    showToast(`${item.name} נוסף לרשימה!`, 'shopping_cart');
+  }
+}
+
+function openEditFromCard(id) {
+  state.editingItemId = id;
+  openModal('edit');
+}
+
+// ============================================================
+// SCREEN 3: SHOPPING LIST
+// ============================================================
+function renderShoppingScreen() {
+  const active = state.shoppingList.filter(s => !s.isCompleted);
+  const completed = state.shoppingList.filter(s => s.isCompleted);
+
+  return `
+    <!-- Quick Add Form -->
+    <div class="px-4 pt-4 pb-3">
+      <div class="bg-surface-container-lowest rounded-2xl p-4 shadow-sm border border-outline-variant">
+        <h3 class="text-title-sm font-bold text-on-surface mb-3">הוסף לרשימה מהירה</h3>
+        <div class="flex gap-2">
+          <input type="text" id="shop-quick-name" placeholder="שם הפריט..."
+            class="flex-1 bg-surface-container rounded-xl px-3 py-2.5 text-body-md text-on-surface placeholder:text-on-surface-variant border border-outline-variant focus:outline-none focus:border-primary"
+            onkeydown="if(event.key==='Enter') shopQuickAdd()">
+          <input type="number" id="shop-quick-qty" placeholder="כמות" min="1" value="1"
+            class="w-20 bg-surface-container rounded-xl px-3 py-2.5 text-body-md text-on-surface border border-outline-variant focus:outline-none focus:border-primary text-center">
+          <button onclick="shopQuickAdd()"
+            class="w-11 h-11 bg-primary text-white rounded-xl flex items-center justify-center active:scale-95 transition-transform flex-shrink-0">
+            <span class="material-symbols-outlined">add</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Active Items -->
+    <div class="px-4 pb-2">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="text-title-sm font-bold text-on-surface">לקנות (${active.length})</h3>
+        ${active.length > 0 ? `<button onclick="clearCompleted()" class="text-label-md text-primary active:scale-95 transition-transform">סמן הכל</button>` : ''}
+      </div>
+      <div class="flex flex-col gap-2">
+        ${active.length === 0 ? `
+          <div class="text-center py-10 text-on-surface-variant">
+            <span class="material-symbols-outlined text-5xl mb-3 block opacity-30">shopping_cart</span>
+            <p class="text-body-lg font-medium">הרשימה ריקה</p>
+            <p class="text-body-sm opacity-70">הוסף פריטים לקנייה</p>
+          </div>` :
+          active.map(item => renderShoppingItem(item)).join('')}
+      </div>
+    </div>
+
+    <!-- Completed Items -->
+    ${completed.length > 0 ? `
+      <div class="px-4 pb-4">
+        <div class="flex items-center justify-between mb-2 mt-2">
+          <h3 class="text-label-lg font-bold text-on-surface-variant">נרכש (${completed.length})</h3>
+          <button onclick="clearCompleted()" class="text-label-md text-on-surface-variant active:scale-95 transition-transform">נקה</button>
+        </div>
+        <div class="flex flex-col gap-2">
+          ${completed.map(item => renderShoppingItem(item)).join('')}
+        </div>
+      </div>` : ''}
+  `;
+}
+
+function renderShoppingItem(item) {
+  const invItem = item.inventoryItemId ? state.inventoryList.find(i => i.id === item.inventoryItemId) : null;
+  return `
+    <div class="shopping-item bg-surface-container-lowest rounded-2xl px-4 py-3 border border-outline-variant flex items-center gap-3 ${item.isCompleted ? 'opacity-60' : ''}">
+      <input type="checkbox" class="custom-checkbox" ${item.isCompleted ? 'checked' : ''}
+        onchange="toggleShoppingItem('${item.id}', this.checked)">
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-2">
+          <span class="text-body-lg font-medium text-on-surface ${item.isCompleted ? 'line-through' : ''} truncate">${escapeHtml(item.name)}</span>
+          <span class="text-label-sm bg-surface-container text-on-surface-variant px-2 py-0.5 rounded-full flex-shrink-0">x${item.requestedQuantity}</span>
+        </div>
+        <div class="flex items-center gap-2 mt-0.5 flex-wrap">
+          ${item.note ? `<span class="text-body-sm text-on-surface-variant truncate">${escapeHtml(item.note)}</span>` : ''}
+          <span class="text-label-sm text-on-surface-variant opacity-70">הוסיף: ${escapeHtml(item.addedBy)}</span>
+          ${invItem ? `<span class="text-label-sm text-primary/70">↔ מלאי</span>` : ''}
+        </div>
+      </div>
+      <button onclick="removeShoppingItem('${item.id}')"
+        class="w-8 h-8 rounded-full flex items-center justify-center text-on-surface-variant hover:text-error hover:bg-status-empty-bg active:scale-90 transition-all flex-shrink-0">
+        <span class="material-symbols-outlined" style="font-size:18px">delete</span>
+      </button>
+    </div>
+  `;
+}
+
+function attachShoppingListeners() {}
+
+function shopQuickAdd() {
+  const nameEl = document.getElementById('shop-quick-name');
+  const qtyEl = document.getElementById('shop-quick-qty');
+  const name = nameEl.value.trim();
+  const qty = parseInt(qtyEl.value) || 1;
+  if (!name) { nameEl.focus(); return; }
+
+  // Check if exists in inventory
+  const invMatch = state.inventoryList.find(i => i.name === name);
+
+  state.shoppingList.unshift({
+    id: genId(),
+    inventoryItemId: invMatch ? invMatch.id : null,
+    name,
+    requestedQuantity: qty,
+    note: '',
+    addedBy: 'אני',
+    addedAt: new Date().toISOString(),
+    isCompleted: false,
+  });
+  nameEl.value = '';
+  qtyEl.value = '1';
+  renderActiveTab();
+  showToast(`${name} נוסף לרשימה!`, 'shopping_cart');
+}
+
+function toggleShoppingItem(id, checked) {
+  const item = state.shoppingList.find(s => s.id === id);
+  if (!item) return;
+  item.isCompleted = checked;
+
+  // Sync inventory if linked
+  if (checked && item.inventoryItemId) {
+    const invItem = state.inventoryList.find(i => i.id === item.inventoryItemId);
+    if (invItem) {
+      invItem.quantity += item.requestedQuantity;
+      invItem.status = invItem.quantity >= 3 ? 'מלא' : invItem.quantity >= 1 ? 'חצי' : 'כמעט ריק';
+      invItem.lastUpdated = new Date().toISOString();
+      showToast(`${invItem.name} עודכן במלאי!`, 'sync');
+    }
+  } else if (checked) {
+    showToast(`${item.name} סומן כנרכש`, 'check_circle');
+  }
+
+  setTimeout(() => renderActiveTab(), 300);
+}
+
+function removeShoppingItem(id) {
+  const item = state.shoppingList.find(s => s.id === id);
+  state.shoppingList = state.shoppingList.filter(s => s.id !== id);
+  renderActiveTab();
+  if (item) showToast(`${item.name} הוסר`, 'delete');
+}
+
+function clearCompleted() {
+  state.shoppingList = state.shoppingList.filter(s => !s.isCompleted);
+  renderActiveTab();
+  showToast('פריטים שנרכשו נמחקו', 'done_all');
+}
+
+// ============================================================
+// MODAL: QUICK ADD
+// ============================================================
+function renderQuickAddModal() {
+  const content = document.getElementById('quick-add-content');
+  content.innerHTML = renderQuickAddForm();
+  attachQuickAddListeners();
+}
+
+function renderQuickAddForm() {
+  const isExisting = state.quickAddMode === 'existing' && state.quickAddSelectedItem;
+  const item = state.quickAddSelectedItem;
+
+  return `
+    <!-- Name Input with Autocomplete -->
+    <div class="mb-4 relative">
+      <label class="text-label-lg text-on-surface-variant mb-1.5 block">שם הפריט</label>
+      <div class="relative">
+        <input type="text" id="qa-name" placeholder="הקלד שם פריט..."
+          value="${isExisting ? escapeHtml(item.name) : ''}"
+          autocomplete="off"
+          class="w-full bg-surface-container rounded-xl px-4 py-3 text-body-lg text-on-surface placeholder:text-on-surface-variant border border-outline-variant focus:outline-none focus:border-primary"
+          oninput="onQANameInput(this.value)" onblur="setTimeout(hideAutocomplete, 150)">
+        <div id="autocomplete-dropdown" class="absolute top-full right-0 left-0 bg-surface-container-lowest border border-outline-variant rounded-xl shadow-lg mt-1 hidden overflow-hidden">
+        </div>
+      </div>
+    </div>
+
+    ${isExisting ? `
+      <!-- Existing Item Mode -->
+      <div class="bg-primary/5 border border-primary/20 rounded-xl p-3 mb-4 flex items-center gap-3">
+        <span class="material-symbols-outlined text-primary">inventory_2</span>
+        <div class="flex-1">
+          <div class="text-label-lg font-bold text-primary">פריט קיים במלאי</div>
+          <div class="text-body-sm text-on-surface-variant">כמות נוכחית: ${item.quantity} | ${item.status}</div>
+        </div>
+      </div>
+
+      <!-- Quantity Stepper -->
+      <div class="mb-4">
+        <label class="text-label-lg text-on-surface-variant mb-1.5 block">הוסף כמות</label>
+        <div class="flex items-center gap-4">
+          <button onclick="qaStepQty(-1)" class="w-11 h-11 rounded-xl border-2 border-outline-variant flex items-center justify-center text-on-surface hover:border-primary active:scale-90 transition-all">
+            <span class="material-symbols-outlined">remove</span>
+          </button>
+          <input type="number" id="qa-qty" value="1" min="1"
+            class="flex-1 bg-surface-container rounded-xl px-4 py-3 text-title-md font-bold text-center text-on-surface border border-outline-variant focus:outline-none focus:border-primary">
+          <button onclick="qaStepQty(1)" class="w-11 h-11 rounded-xl border-2 border-outline-variant flex items-center justify-center text-on-surface hover:border-primary active:scale-90 transition-all">
+            <span class="material-symbols-outlined">add</span>
+          </button>
+        </div>
+      </div>
+
+      <button onclick="submitQuickAdd()" class="w-full bg-primary text-white rounded-xl py-4 text-title-sm font-bold active:scale-95 transition-transform flex items-center justify-center gap-2">
+        <span class="material-symbols-outlined">add_circle</span>
+        עדכן כמות במלאי
+      </button>
+    ` : `
+      <!-- New Item Mode -->
+      <!-- Quantity -->
+      <div class="mb-4">
+        <label class="text-label-lg text-on-surface-variant mb-1.5 block">כמות</label>
+        <div class="flex items-center gap-4">
+          <button onclick="qaStepQty(-1)" class="w-11 h-11 rounded-xl border-2 border-outline-variant flex items-center justify-center text-on-surface hover:border-primary active:scale-90 transition-all">
+            <span class="material-symbols-outlined">remove</span>
+          </button>
+          <input type="number" id="qa-qty" value="1" min="1"
+            class="flex-1 bg-surface-container rounded-xl px-4 py-3 text-title-md font-bold text-center text-on-surface border border-outline-variant focus:outline-none focus:border-primary">
+          <button onclick="qaStepQty(1)" class="w-11 h-11 rounded-xl border-2 border-outline-variant flex items-center justify-center text-on-surface hover:border-primary active:scale-90 transition-all">
+            <span class="material-symbols-outlined">add</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Category -->
+      <div class="mb-4">
+        <label class="text-label-lg text-on-surface-variant mb-1.5 block">קטגוריה</label>
+        <div class="flex gap-2 flex-wrap">
+          ${['מקרר','מזווה','חומרי ניקוי','קפאון','כללי'].map(cat => `
+            <button onclick="selectQACategory('${cat}')" id="qa-cat-${cat.replace(/ /g,'_')}"
+              class="flex items-center gap-1 px-3 py-1.5 rounded-full border border-outline-variant text-label-lg text-on-surface-variant bg-surface-container-lowest transition-all active:scale-95 qa-cat-btn">
+              <span class="material-symbols-outlined" style="font-size:14px">${categoryIcon(cat)}</span>
+              ${cat}
+            </button>`).join('')}
+        </div>
+      </div>
+
+      <!-- Status -->
+      <div class="mb-5">
+        <label class="text-label-lg text-on-surface-variant mb-1.5 block">מצב</label>
+        <div class="flex gap-2">
+          <button onclick="selectQAStatus('מלא')" id="qa-status-full"
+            class="status-btn flex-1 py-2.5 rounded-xl border border-outline-variant text-label-lg font-medium transition-all active:scale-95">מלא</button>
+          <button onclick="selectQAStatus('חצי')" id="qa-status-half"
+            class="status-btn flex-1 py-2.5 rounded-xl border border-outline-variant text-label-lg font-medium transition-all active:scale-95">חצי</button>
+          <button onclick="selectQAStatus('כמעט ריק')" id="qa-status-empty"
+            class="status-btn flex-1 py-2.5 rounded-xl border border-outline-variant text-label-lg font-medium transition-all active:scale-95">כמעט ריק</button>
+        </div>
+      </div>
+
+      <button onclick="submitQuickAdd()" class="w-full bg-primary text-white rounded-xl py-4 text-title-sm font-bold active:scale-95 transition-transform flex items-center justify-center gap-2">
+        <span class="material-symbols-outlined">add_circle</span>
+        הוסף למלאי
+      </button>
+    `}
+  `;
+}
+
+let qaSelectedCategory = 'כללי';
+let qaSelectedStatus = 'מלא';
+
+function attachQuickAddListeners() {
+  qaSelectedCategory = 'כללי';
+  qaSelectedStatus = 'מלא';
+  // Highlight defaults
+  setTimeout(() => {
+    selectQACategory('כללי', false);
+    selectQAStatus('מלא', false);
+  }, 50);
+}
+
+function onQANameInput(val) {
+  const matches = state.inventoryList.filter(i => val.length >= 1 && i.name.includes(val));
+  const dd = document.getElementById('autocomplete-dropdown');
+  if (!dd) return;
+  if (matches.length === 0) {
+    dd.classList.add('hidden');
+    // If was existing mode, reset
+    if (state.quickAddMode === 'existing') {
+      state.quickAddMode = 'new';
+      state.quickAddSelectedItem = null;
+      renderQuickAddModal();
+      document.getElementById('qa-name').value = val;
+    }
+    return;
+  }
+  dd.classList.remove('hidden');
+  dd.innerHTML = matches.map(item => {
+    const sc = statusConfig(item.status);
+    return `
+      <button class="w-full flex items-center gap-3 px-4 py-3 hover:bg-surface-container text-right transition-colors"
+        onmousedown="selectAutocompleteItem('${item.id}')">
+        <span class="material-symbols-outlined text-on-surface-variant">${categoryIcon(item.category)}</span>
+        <div class="flex-1 min-w-0">
+          <div class="text-body-md font-medium text-on-surface">${escapeHtml(item.name)}</div>
+          <div class="text-body-sm text-on-surface-variant">${item.category} · כמות: ${item.quantity}</div>
+        </div>
+        <span class="text-label-sm ${sc.bg} ${sc.text} px-2 py-0.5 rounded-full border border-current/20">${item.status}</span>
+      </button>
+    `;
+  }).join('');
+}
+
+function hideAutocomplete() {
+  const dd = document.getElementById('autocomplete-dropdown');
+  if (dd) dd.classList.add('hidden');
+}
+
+function selectAutocompleteItem(id) {
+  const item = state.inventoryList.find(i => i.id === id);
+  if (!item) return;
+  state.quickAddMode = 'existing';
+  state.quickAddSelectedItem = item;
+  renderQuickAddModal();
+}
+
+function selectQACategory(cat, toast = true) {
+  qaSelectedCategory = cat;
+  document.querySelectorAll('.qa-cat-btn').forEach(btn => {
+    btn.classList.remove('bg-primary', 'text-white', 'border-primary');
+    btn.classList.add('border-outline-variant', 'text-on-surface-variant', 'bg-surface-container-lowest');
+  });
+  const btn = document.getElementById('qa-cat-' + cat.replace(/ /g,'_'));
+  if (btn) {
+    btn.classList.add('bg-primary', 'text-white', 'border-primary');
+    btn.classList.remove('border-outline-variant', 'text-on-surface-variant', 'bg-surface-container-lowest');
+  }
+}
+
+function selectQAStatus(status, toast = true) {
+  qaSelectedStatus = status;
+  ['מלא','חצי','כמעט ריק'].forEach(s => {
+    const id = { 'מלא': 'qa-status-full', 'חצי': 'qa-status-half', 'כמעט ריק': 'qa-status-empty' }[s];
+    const btn = document.getElementById(id);
+    if (!btn) return;
+    btn.classList.remove('active-full','active-half','active-empty','bg-surface-container-lowest');
+    btn.classList.add('bg-surface-container-lowest');
+  });
+  const idMap = { 'מלא': 'qa-status-full', 'חצי': 'qa-status-half', 'כמעט ריק': 'qa-status-empty' };
+  const classMap = { 'מלא': 'active-full', 'חצי': 'active-half', 'כמעט ריק': 'active-empty' };
+  const btn = document.getElementById(idMap[status]);
+  if (btn) {
+    btn.classList.add(classMap[status]);
+    btn.classList.remove('bg-surface-container-lowest');
+  }
+}
+
+function qaStepQty(delta) {
+  const el = document.getElementById('qa-qty');
+  if (!el) return;
+  el.value = Math.max(1, (parseInt(el.value) || 1) + delta);
+}
+
+function submitQuickAdd() {
+  const nameEl = document.getElementById('qa-name');
+  const qtyEl = document.getElementById('qa-qty');
+  if (!nameEl || !qtyEl) return;
+  const name = nameEl.value.trim();
+  const qty = parseInt(qtyEl.value) || 1;
+  if (!name) { nameEl.focus(); return; }
+
+  if (state.quickAddMode === 'existing' && state.quickAddSelectedItem) {
+    const item = state.inventoryList.find(i => i.id === state.quickAddSelectedItem.id);
+    if (item) {
+      item.quantity += qty;
+      item.status = item.quantity >= 4 ? 'מלא' : item.quantity >= 2 ? 'חצי' : 'כמעט ריק';
+      item.lastUpdated = new Date().toISOString();
+      showToast(`${item.name} עודכן! כמות: ${item.quantity}`, 'inventory');
+    }
+  } else {
+    const existing = state.inventoryList.find(i => i.name === name);
+    if (existing) {
+      existing.quantity += qty;
+      existing.lastUpdated = new Date().toISOString();
+      showToast(`${name} עודכן במלאי!`, 'inventory');
+    } else {
+      state.inventoryList.unshift({
+        id: genId(),
+        name,
+        quantity: qty,
+        status: qaSelectedStatus,
+        category: qaSelectedCategory,
+        lastUpdated: new Date().toISOString(),
+      });
+      showToast(`${name} נוסף למלאי!`, 'add_circle');
+    }
+  }
+
+  state.quickAddMode = 'new';
+  state.quickAddSelectedItem = null;
+  closeModal('quickAdd');
+  if (state.currentTab === 'inventory') renderActiveTab();
+}
+
+// ============================================================
+// MODAL: EDIT PRODUCT
+// ============================================================
+function renderEditModal() {
+  const item = state.inventoryList.find(i => i.id === state.editingItemId);
+  if (!item) return;
+
+  const content = document.getElementById('edit-modal-content');
+  content.innerHTML = `
+    <!-- Name -->
+    <div class="mb-4">
+      <label class="text-label-lg text-on-surface-variant mb-1.5 block">שם הפריט</label>
+      <input type="text" id="edit-name" value="${escapeHtml(item.name)}"
+        class="w-full bg-surface-container rounded-xl px-4 py-3 text-body-lg text-on-surface border border-outline-variant focus:outline-none focus:border-primary">
+    </div>
+
+    <!-- Quantity Stepper -->
+    <div class="mb-4">
+      <label class="text-label-lg text-on-surface-variant mb-1.5 block">כמות</label>
+      <div class="flex items-center gap-4">
+        <button onclick="editStepQty(-1)" class="w-12 h-12 rounded-xl border-2 border-outline-variant flex items-center justify-center text-on-surface hover:border-primary active:scale-90 transition-all text-xl">
+          <span class="material-symbols-outlined">remove</span>
+        </button>
+        <input type="number" id="edit-qty" value="${item.quantity}" min="0"
+          class="flex-1 bg-surface-container rounded-xl px-4 py-3 text-headline-sm font-bold text-center text-on-surface border border-outline-variant focus:outline-none focus:border-primary">
+        <button onclick="editStepQty(1)" class="w-12 h-12 rounded-xl border-2 border-outline-variant flex items-center justify-center text-on-surface hover:border-primary active:scale-90 transition-all text-xl">
+          <span class="material-symbols-outlined">add</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Category -->
+    <div class="mb-4">
+      <label class="text-label-lg text-on-surface-variant mb-1.5 block">קטגוריה</label>
+      <div class="flex gap-2 flex-wrap">
+        ${['מקרר','מזווה','חומרי ניקוי','קפאון','כללי'].map(cat => `
+          <button onclick="selectEditCategory('${cat}')" id="edit-cat-${cat.replace(/ /g,'_')}"
+            class="flex items-center gap-1 px-3 py-1.5 rounded-full border text-label-lg transition-all active:scale-95 edit-cat-btn
+              ${item.category === cat ? 'bg-primary text-white border-primary' : 'border-outline-variant text-on-surface-variant bg-surface-container-lowest'}">
+            <span class="material-symbols-outlined" style="font-size:14px">${categoryIcon(cat)}</span>
+            ${cat}
+          </button>`).join('')}
+      </div>
+    </div>
+
+    <!-- Status -->
+    <div class="mb-5">
+      <label class="text-label-lg text-on-surface-variant mb-1.5 block">מצב המלאי</label>
+      <div class="flex gap-2">
+        <button onclick="selectEditStatus('מלא')" id="edit-status-full"
+          class="status-btn flex-1 py-3 rounded-xl border text-label-lg font-medium transition-all active:scale-95 ${item.status === 'מלא' ? 'active-full' : 'border-outline-variant bg-surface-container-lowest text-on-surface-variant'}">מלא</button>
+        <button onclick="selectEditStatus('חצי')" id="edit-status-half"
+          class="status-btn flex-1 py-3 rounded-xl border text-label-lg font-medium transition-all active:scale-95 ${item.status === 'חצי' ? 'active-half' : 'border-outline-variant bg-surface-container-lowest text-on-surface-variant'}">חצי</button>
+        <button onclick="selectEditStatus('כמעט ריק')" id="edit-status-empty"
+          class="status-btn flex-1 py-3 rounded-xl border text-label-lg font-medium transition-all active:scale-95 ${item.status === 'כמעט ריק' ? 'active-empty' : 'border-outline-variant bg-surface-container-lowest text-on-surface-variant'}">כמעט ריק</button>
+      </div>
+    </div>
+
+    <!-- Notes -->
+    <div class="mb-5">
+      <label class="text-label-lg text-on-surface-variant mb-1.5 block">הערות (אופציונלי)</label>
+      <textarea id="edit-notes" rows="2" placeholder="הוסף הערה..."
+        class="w-full bg-surface-container rounded-xl px-4 py-3 text-body-md text-on-surface border border-outline-variant focus:outline-none focus:border-primary resize-none">${escapeHtml(item.notes || '')}</textarea>
+    </div>
+
+    <!-- Save + Delete -->
+    <div class="flex gap-3">
+      <button onclick="deleteItemPrompt('${item.id}')"
+        class="w-12 h-12 rounded-xl border border-outline-variant flex items-center justify-center text-error hover:bg-status-empty-bg active:scale-90 transition-all flex-shrink-0">
+        <span class="material-symbols-outlined">delete</span>
+      </button>
+      <button onclick="saveEditItem('${item.id}')"
+        class="flex-1 bg-primary text-white rounded-xl py-3.5 text-title-sm font-bold active:scale-95 transition-transform flex items-center justify-center gap-2">
+        <span class="material-symbols-outlined">save</span>
+        שמור שינויים
+      </button>
+    </div>
+  `;
+
+  // Store current category/status for edit
+  window._editCategory = item.category;
+  window._editStatus = item.status;
+}
+
+function editStepQty(delta) {
+  const el = document.getElementById('edit-qty');
+  if (!el) return;
+  el.value = Math.max(0, (parseInt(el.value) || 0) + delta);
+}
+
+function selectEditCategory(cat) {
+  window._editCategory = cat;
+  document.querySelectorAll('.edit-cat-btn').forEach(btn => {
+    btn.classList.remove('bg-primary', 'text-white', 'border-primary');
+    btn.classList.add('border-outline-variant', 'text-on-surface-variant', 'bg-surface-container-lowest');
+  });
+  const btn = document.getElementById('edit-cat-' + cat.replace(/ /g,'_'));
+  if (btn) {
+    btn.classList.add('bg-primary', 'text-white', 'border-primary');
+    btn.classList.remove('border-outline-variant', 'text-on-surface-variant', 'bg-surface-container-lowest');
+  }
+}
+
+function selectEditStatus(status) {
+  window._editStatus = status;
+  ['מלא','חצי','כמעט ריק'].forEach(s => {
+    const id = { 'מלא': 'edit-status-full', 'חצי': 'edit-status-half', 'כמעט ריק': 'edit-status-empty' }[s];
+    const btn = document.getElementById(id);
+    if (!btn) return;
+    btn.classList.remove('active-full','active-half','active-empty','bg-surface-container-lowest');
+    btn.classList.add('bg-surface-container-lowest', 'border-outline-variant', 'text-on-surface-variant');
+    btn.style.background = '';
+    btn.style.color = '';
+    btn.style.borderColor = '';
+  });
+  const idMap = { 'מלא': 'edit-status-full', 'חצי': 'edit-status-half', 'כמעט ריק': 'edit-status-empty' };
+  const classMap = { 'מלא': 'active-full', 'חצי': 'active-half', 'כמעט ריק': 'active-empty' };
+  const btn = document.getElementById(idMap[status]);
+  if (btn) {
+    btn.classList.add(classMap[status]);
+    btn.classList.remove('bg-surface-container-lowest', 'border-outline-variant', 'text-on-surface-variant');
+  }
+}
+
+function saveEditItem(id) {
+  const item = state.inventoryList.find(i => i.id === id);
+  if (!item) return;
+  const nameEl = document.getElementById('edit-name');
+  const qtyEl = document.getElementById('edit-qty');
+  const notesEl = document.getElementById('edit-notes');
+  if (!nameEl || !qtyEl) return;
+
+  const newName = nameEl.value.trim();
+  if (!newName) { nameEl.focus(); return; }
+
+  item.name = newName;
+  item.quantity = parseInt(qtyEl.value) || 0;
+  item.category = window._editCategory || item.category;
+  item.status = window._editStatus || item.status;
+  item.notes = notesEl ? notesEl.value.trim() : '';
+  item.lastUpdated = new Date().toISOString();
+
+  closeModal('edit');
+  if (state.currentTab === 'inventory') renderActiveTab();
+  showToast(`${item.name} עודכן!`, 'save');
+}
+
+function deleteItemPrompt(id) {
+  const item = state.inventoryList.find(i => i.id === id);
+  if (!item) return;
+  state.deletingItemId = id;
+  document.getElementById('delete-confirm-msg').textContent = `האם למחוק את "${item.name}"?`;
+
+  const dialog = document.querySelector('#delete-confirm > div');
+  dialog.classList.remove('closed');
+  dialog.classList.add('open');
+  document.getElementById('delete-confirm').classList.remove('pointer-events-none');
+}
+
+function cancelDelete() {
+  state.deletingItemId = null;
+  const dialog = document.querySelector('#delete-confirm > div');
+  dialog.classList.add('closed');
+  dialog.classList.remove('open');
+  document.getElementById('delete-confirm').classList.add('pointer-events-none');
+}
+
+function confirmDelete() {
+  const id = state.deletingItemId;
+  if (!id) return;
+  const item = state.inventoryList.find(i => i.id === id);
+  state.inventoryList = state.inventoryList.filter(i => i.id !== id);
+  // Remove linked shopping items
+  state.shoppingList = state.shoppingList.map(s => s.inventoryItemId === id ? { ...s, inventoryItemId: null } : s);
+  cancelDelete();
+  closeModal('edit');
+  if (state.currentTab === 'inventory') renderActiveTab();
+  if (item) showToast(`${item.name} נמחק`, 'delete');
+}
+
+// ============================================================
+// MODAL: PROFILE
+// ============================================================
+function renderProfileModal() {
+  const content = document.getElementById('profile-modal-content');
+  const user = state.currentUser;
+
+  if (!user.isLoggedIn) {
+    content.innerHTML = renderAuthForm();
+    return;
+  }
+
+  content.innerHTML = `
+    <!-- Household Card -->
+    <div class="bg-gradient-to-l from-primary to-primary-container rounded-2xl p-5 mb-5 text-white">
+      <div class="flex items-center gap-4">
+        <div class="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center text-2xl font-bold">
+          ${user.name.charAt(0)}
+        </div>
+        <div>
+          <div class="text-title-lg font-bold">${escapeHtml(user.name)}</div>
+          <div class="text-body-sm opacity-80">${escapeHtml(user.email)}</div>
+          <div class="mt-1 inline-flex items-center gap-1 bg-white/20 px-2 py-0.5 rounded-full text-label-sm">
+            <span class="material-symbols-outlined" style="font-size:12px">home</span>
+            בית משפחה
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="grid grid-cols-3 gap-3 mb-5">
+      <div class="bg-surface-container rounded-xl p-3 text-center">
+        <div class="text-headline-sm font-bold text-primary">${state.inventoryList.length}</div>
+        <div class="text-label-sm text-on-surface-variant">פריטי מלאי</div>
+      </div>
+      <div class="bg-surface-container rounded-xl p-3 text-center">
+        <div class="text-headline-sm font-bold text-primary">${state.shoppingList.filter(s=>!s.isCompleted).length}</div>
+        <div class="text-label-sm text-on-surface-variant">לקנייה</div>
+      </div>
+      <div class="bg-surface-container rounded-xl p-3 text-center">
+        <div class="text-headline-sm font-bold text-status-empty-text">${state.inventoryList.filter(i=>i.status==='כמעט ריק').length}</div>
+        <div class="text-label-sm text-on-surface-variant">כמעט ריקים</div>
+      </div>
+    </div>
+
+    <!-- Family Members -->
+    <div class="mb-5">
+      <h3 class="text-title-sm font-bold text-on-surface mb-3">חברי המשפחה</h3>
+      <div class="flex flex-col gap-2">
+        ${state.familyMembers.map(m => `
+          <div class="flex items-center gap-3 bg-surface-container rounded-xl px-4 py-3">
+            <div class="w-10 h-10 rounded-full bg-secondary-container flex items-center justify-center text-primary font-bold">
+              ${m.avatar}
+            </div>
+            <div class="flex-1">
+              <div class="text-body-lg font-medium text-on-surface">${escapeHtml(m.name)}</div>
+              <div class="text-label-md text-on-surface-variant">${escapeHtml(m.role)}</div>
+            </div>
+            <span class="material-symbols-outlined text-on-surface-variant opacity-40">chevron_left</span>
+          </div>`).join('')}
+        <button class="flex items-center gap-3 bg-surface-container rounded-xl px-4 py-3 border-2 border-dashed border-outline-variant text-on-surface-variant active:scale-95 transition-transform w-full">
+          <div class="w-10 h-10 rounded-full bg-surface-container-lowest border-2 border-dashed border-outline-variant flex items-center justify-center">
+            <span class="material-symbols-outlined">add</span>
+          </div>
+          <span class="text-body-md">הוסף בן משפחה</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Settings Section -->
+    <div class="mb-5 bg-surface-container rounded-2xl overflow-hidden">
+      <div class="px-4 py-3 border-b border-outline-variant flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <span class="material-symbols-outlined text-on-surface-variant">notifications</span>
+          <span class="text-body-lg text-on-surface">התראות</span>
+        </div>
+        <label class="relative inline-flex items-center cursor-pointer">
+          <input type="checkbox" class="sr-only peer" checked>
+          <div class="w-11 h-6 bg-outline-variant rounded-full peer-checked:bg-primary transition-colors"></div>
+          <div class="absolute right-1 top-1 w-4 h-4 bg-white rounded-full shadow transition-transform peer-checked:translate-x-[-1.25rem]"></div>
+        </label>
+      </div>
+      <div class="px-4 py-3 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <span class="material-symbols-outlined text-on-surface-variant">dark_mode</span>
+          <span class="text-body-lg text-on-surface">מצב כהה</span>
+        </div>
+        <label class="relative inline-flex items-center cursor-pointer">
+          <input type="checkbox" class="sr-only peer">
+          <div class="w-11 h-6 bg-outline-variant rounded-full peer-checked:bg-primary transition-colors"></div>
+          <div class="absolute right-1 top-1 w-4 h-4 bg-white rounded-full shadow transition-transform peer-checked:translate-x-[-1.25rem]"></div>
+        </label>
+      </div>
+    </div>
+
+    <!-- Logout -->
+    <button onclick="logout()" class="w-full border border-error text-error rounded-xl py-3.5 text-title-sm font-medium active:scale-95 transition-transform flex items-center justify-center gap-2">
+      <span class="material-symbols-outlined">logout</span>
+      התנתקות
+    </button>
+  `;
+}
+
+function renderAuthForm() {
+  return `
+    <div class="text-center py-8">
+      <div class="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+        <span class="material-symbols-outlined text-primary text-4xl">family_home</span>
+      </div>
+      <h3 class="text-title-lg font-bold text-on-surface mb-2">כניסה לבית המשפחה</h3>
+      <p class="text-body-md text-on-surface-variant mb-6">התחבר לניהול המלאי המשפחתי</p>
+      <div class="flex gap-3 mb-4">
+        <button onclick="showAuthTab('login')" id="auth-tab-login" class="flex-1 py-2 rounded-xl bg-primary text-white font-bold">כניסה</button>
+        <button onclick="showAuthTab('signup')" id="auth-tab-signup" class="flex-1 py-2 rounded-xl bg-surface-container text-on-surface-variant font-medium">הרשמה</button>
+      </div>
+      <div class="flex flex-col gap-3">
+        <input type="email" placeholder="אימייל" class="w-full bg-surface-container rounded-xl px-4 py-3 text-body-lg border border-outline-variant focus:outline-none focus:border-primary">
+        <input type="password" placeholder="סיסמה" class="w-full bg-surface-container rounded-xl px-4 py-3 text-body-lg border border-outline-variant focus:outline-none focus:border-primary">
+        <button onclick="loginDemo()" class="w-full bg-primary text-white rounded-xl py-3.5 text-title-sm font-bold active:scale-95 transition-transform">כניסה</button>
+      </div>
+    </div>
+  `;
+}
+
+function logout() {
+  state.currentUser.isLoggedIn = false;
+  renderProfileModal();
+  showToast('התנתקת בהצלחה', 'logout');
+}
+
+function loginDemo() {
+  state.currentUser.isLoggedIn = true;
+  closeModal('profile');
+  showToast('ברוך הבא, משפחת אמודאי!', 'family_home');
+}
+
+function showAuthTab(tab) {
+  const loginBtn = document.getElementById('auth-tab-login');
+  const signupBtn = document.getElementById('auth-tab-signup');
+  if (!loginBtn || !signupBtn) return;
+  if (tab === 'login') {
+    loginBtn.classList.add('bg-primary', 'text-white');
+    loginBtn.classList.remove('bg-surface-container', 'text-on-surface-variant');
+    signupBtn.classList.remove('bg-primary', 'text-white');
+    signupBtn.classList.add('bg-surface-container', 'text-on-surface-variant');
+  } else {
+    signupBtn.classList.add('bg-primary', 'text-white');
+    signupBtn.classList.remove('bg-surface-container', 'text-on-surface-variant');
+    loginBtn.classList.remove('bg-primary', 'text-white');
+    loginBtn.classList.add('bg-surface-container', 'text-on-surface-variant');
+  }
+}
+
+// ============================================================
+// HELPERS
+// ============================================================
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ============================================================
+// INIT
+// ============================================================
+function init() {
+  switchTab('inventory');
+  updateNavBar();
+  // Show low-stock badge
+  const lowCount = state.inventoryList.filter(i => i.status === 'כמעט ריק').length;
+  if (lowCount > 0) {
+    document.getElementById('notif-badge').classList.remove('hidden');
+  }
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
