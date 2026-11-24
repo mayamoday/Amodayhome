@@ -166,9 +166,9 @@ tailwind.config = {
       </button>
       <div class="text-center">
         <div class="text-title-md font-bold text-on-surface" id="header-title">מלאי הבית</div>
-        <div class="text-label-md text-on-surface-variant" id="header-subtitle">משפחת אמודאי</div>
+        <div class="text-label-md text-on-surface-variant" id="header-subtitle"></div>
       </div>
-      <button onclick="openModal('notifications')" class="w-10 h-10 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container active:scale-95 transition-transform relative">
+      <button onclick="openModal('notifications')" id="notif-button" class="invisible w-10 h-10 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container active:scale-95 transition-transform relative">
         <span class="material-symbols-outlined">notifications</span>
         <span id="notif-badge" class="absolute top-1 right-1 w-2 h-2 bg-error rounded-full hidden"></span>
       </button>
@@ -181,7 +181,7 @@ tailwind.config = {
   </main>
 
   <!-- BOTTOM NAV -->
-  <nav class="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-lg bg-surface-container-lowest border-t border-outline-variant safe-bottom z-40">
+  <nav id="bottom-nav" class="hidden fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-lg bg-surface-container-lowest border-t border-outline-variant safe-bottom z-40">
     <div class="flex items-end justify-around px-2 pt-2 pb-2 relative">
       <!-- Inventory Tab -->
       <button onclick="switchTab('inventory')" id="tab-inventory" class="flex flex-col items-center gap-1 flex-1 py-1 px-2 rounded-xl transition-all">
@@ -254,7 +254,7 @@ tailwind.config = {
       <div class="w-10 h-1 bg-outline-variant rounded-full mx-auto mb-3"></div>
       <div class="flex items-center justify-between px-4 pb-2 border-b border-outline-variant">
         <h2 class="text-title-lg text-on-surface">פרופיל משפחה</h2>
-        <button onclick="closeModal('profile')" class="w-9 h-9 rounded-full flex items-center justify-center hover:bg-surface-container text-on-surface-variant active:scale-95 transition-transform">
+        <button onclick="closeModal('profile')" id="profile-close-btn" class="w-9 h-9 rounded-full flex items-center justify-center hover:bg-surface-container text-on-surface-variant active:scale-95 transition-transform">
           <span class="material-symbols-outlined">close</span>
         </button>
       </div>
@@ -318,7 +318,10 @@ tailwind.config = {
 // The publishable key is public by design: Row Level Security in the database protects the data
 const SUPABASE_URL = 'https://npdpkyglgskyzfsrgerw.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_xjNsPfeHtuCMik1c-GAKGg_ndrYIi1n';
-const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+// The session is stored in localStorage and refreshed automatically, so the user stays logged in across refreshes
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+});
 
 const state = {
   currentTab: 'inventory',
@@ -332,6 +335,9 @@ const state = {
   categories: [],           // [{ id, name, icon }]
   settings: { notifications_enabled: true, dark_mode: false },
   authTab: 'login',
+  authForm: { name: '', email: '', password: '' }, // keeps what was typed when switching between "כניסה" and "הרשמה"
+  authMessage: null,        // { type: 'error' | 'success', text } — shown inside the auth form
+  authBusy: false,
   inventoryFilter: { search: '', status: 'הכל', category: 'הכל' },
   editingItemId: null,
   deletingItemId: null,
@@ -463,14 +469,24 @@ function refreshUI() {
   renderActiveTab();
   updateHeader();
   if (state.openModals.includes('profile')) renderProfileModal();
+  enforceAccessGate();
+}
+
+// The logged-in user's name: their name in the family, then the name from sign-up, then the part of the email before the @
+function currentUserDisplayName() {
+  const u = state.currentUser;
+  if (!u.isLoggedIn) return '';
+  const member = state.familyMembers.find(m => m.id === state.memberId);
+  if (member?.name) return member.name;
+  if (u.name && !u.name.includes('@')) return u.name;
+  return (u.email || '').split('@')[0];
 }
 
 function updateHeader() {
-  const title = state.household ? state.household.name : 'בית המשפחה';
   const sub = document.getElementById('header-subtitle');
-  if (sub) sub.textContent = title;
+  if (sub) sub.textContent = currentUserDisplayName() || 'לא מחובר/ת';
   const initials = document.getElementById('user-avatar-initials');
-  if (initials) initials.textContent = (state.currentUser.name || 'א').charAt(0);
+  if (initials) initials.textContent = (currentUserDisplayName() || 'א').charAt(0);
   const lowCount = state.inventoryList.filter(i => i.status === 'כמעט ריק').length;
   document.getElementById('notif-badge').classList.toggle('hidden', lowCount === 0);
 }
@@ -554,7 +570,9 @@ function updateNavBar() {
 
 function renderActiveTab() {
   const main = document.getElementById('main-content');
-  if (state.currentTab === 'inventory') {
+  if (!hasAccess()) {
+    main.innerHTML = renderLockedScreen();
+  } else if (state.currentTab === 'inventory') {
     main.innerHTML = renderInventoryScreen();
     attachInventoryListeners();
   } else {
@@ -566,7 +584,33 @@ function renderActiveTab() {
 // ============================================================
 // MODAL SYSTEM
 // ============================================================
+// ============================================================
+// ACCESS GATE: without a logged-in user who belongs to a household, only the login window is shown
+// ============================================================
+function hasAccess() {
+  return state.currentUser.isLoggedIn && !!state.household;
+}
+
+function enforceAccessGate() {
+  const locked = !hasAccess();
+  document.getElementById('bottom-nav')?.classList.toggle('hidden', locked);
+  document.getElementById('notif-button')?.classList.toggle('invisible', locked);
+  document.getElementById('profile-close-btn')?.classList.toggle('hidden', locked);
+  if (!locked) return;
+  state.openModals.filter(m => m !== 'profile').forEach(closeModal);
+  if (!state.openModals.includes('profile')) openModal('profile');
+}
+
+function renderLockedScreen() {
+  return `
+    <div class="flex flex-col items-center justify-center text-center px-8 py-24">
+      <span class="material-symbols-outlined text-outline-variant" style="font-size:64px">lock</span>
+      <p class="text-title-md font-bold text-on-surface mt-4">יש להתחבר כדי להשתמש במערכת</p>
+    </div>`;
+}
+
 function openModal(name) {
+  if (name !== 'profile' && !hasAccess()) name = 'profile';
   if (state.openModals.includes(name)) return;
   state.openModals.push(name);
   renderModal(name);
@@ -585,6 +629,7 @@ function openModal(name) {
 }
 
 function closeModal(name) {
+  if (name === 'profile' && !hasAccess()) return; // the login window can't be closed without logging in
   const idx = state.openModals.indexOf(name);
   if (idx === -1) return;
   state.openModals.splice(idx, 1);
@@ -1498,8 +1543,38 @@ function renderProfileModal() {
   `;
 }
 
+function renderAuthMessage() {
+  const m = state.authMessage;
+  if (!m) return '';
+  const isErr = m.type === 'error';
+  return `
+    <div role="alert" class="flex items-start gap-2 text-right rounded-xl px-4 py-3 mb-4 border ${isErr ? 'bg-status-empty-bg text-status-empty-text border-status-empty-text/30' : 'bg-status-full-bg text-status-full-text border-status-full-text/30'}">
+      <span class="material-symbols-outlined shrink-0" style="font-size:20px">${isErr ? 'error' : 'mark_email_read'}</span>
+      <span class="text-body-md">${escapeHtml(m.text)}</span>
+    </div>`;
+}
+
+// Translates Supabase auth errors into Hebrew messages
+function authErrorToHebrew(error) {
+  const msg = (error?.message || '').toLowerCase();
+  if (msg.includes('invalid login credentials')) return 'אימייל או סיסמה שגויים, או שהחשבון עדיין ממתין לאישור במייל.';
+  if (msg.includes('email not confirmed')) return 'יש לאשר את כתובת האימייל דרך הקישור שנשלח אליך לפני הכניסה.';
+  if (msg.includes('already registered') || msg.includes('already been registered')) return 'משתמש עם כתובת אימייל זו כבר רשום במערכת.';
+  if (msg.includes('password should be at least')) return 'הסיסמה חייבת להכיל לפחות 6 תווים.';
+  if (msg.includes('invalid') && msg.includes('email')) return 'כתובת האימייל אינה תקינה.';
+  if (msg.includes('rate limit') || error?.status === 429) return 'בוצעו יותר מדי ניסיונות. נסו שוב בעוד כמה דקות.';
+  if (msg.includes('failed to fetch') || msg.includes('network')) return 'אין חיבור לשרת. בדקו את החיבור לאינטרנט ונסו שוב.';
+  return 'אירעה שגיאה: ' + (error?.message || 'שגיאה לא ידועה');
+}
+
+function setAuthMessage(type, text) {
+  state.authMessage = text ? { type, text } : null;
+  if (state.openModals.includes('profile') && !state.currentUser.isLoggedIn) renderProfileModal();
+}
+
 function renderAuthForm() {
   const isSignup = state.authTab === 'signup';
+  const f = state.authForm;
   return `
     <div class="text-center py-8">
       <div class="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
@@ -1511,12 +1586,13 @@ function renderAuthForm() {
         <button onclick="showAuthTab('login')" id="auth-tab-login" class="flex-1 py-2 rounded-xl ${!isSignup ? 'bg-primary text-white font-bold' : 'bg-surface-container text-on-surface-variant font-medium'}">כניסה</button>
         <button onclick="showAuthTab('signup')" id="auth-tab-signup" class="flex-1 py-2 rounded-xl ${isSignup ? 'bg-primary text-white font-bold' : 'bg-surface-container text-on-surface-variant font-medium'}">הרשמה</button>
       </div>
+      ${renderAuthMessage()}
       <div class="flex flex-col gap-3">
-        ${isSignup ? `<input type="text" id="auth-name" placeholder="השם שלך" class="w-full bg-surface-container rounded-xl px-4 py-3 text-body-lg border border-outline-variant focus:outline-none focus:border-primary">` : ''}
-        <input type="email" id="auth-email" placeholder="אימייל" dir="ltr" class="w-full bg-surface-container rounded-xl px-4 py-3 text-body-lg border border-outline-variant focus:outline-none focus:border-primary text-right">
-        <input type="password" id="auth-password" placeholder="סיסמה (לפחות 6 תווים)" dir="ltr" class="w-full bg-surface-container rounded-xl px-4 py-3 text-body-lg border border-outline-variant focus:outline-none focus:border-primary text-right"
+        ${isSignup ? `<input type="text" id="auth-name" placeholder="השם שלך" value="${escapeHtml(f.name)}" oninput="state.authForm.name=this.value" autocomplete="name" class="w-full bg-surface-container rounded-xl px-4 py-3 text-body-lg border border-outline-variant focus:outline-none focus:border-primary">` : ''}
+        <input type="email" id="auth-email" placeholder="אימייל" value="${escapeHtml(f.email)}" oninput="state.authForm.email=this.value" autocomplete="email" dir="ltr" class="w-full bg-surface-container rounded-xl px-4 py-3 text-body-lg border border-outline-variant focus:outline-none focus:border-primary text-right">
+        <input type="password" id="auth-password" placeholder="סיסמה (לפחות 6 תווים)" value="${escapeHtml(f.password)}" oninput="state.authForm.password=this.value" autocomplete="${isSignup ? 'new-password' : 'current-password'}" dir="ltr" class="w-full bg-surface-container rounded-xl px-4 py-3 text-body-lg border border-outline-variant focus:outline-none focus:border-primary text-right"
           onkeydown="if(event.key==='Enter') submitAuth()">
-        <button onclick="submitAuth()" id="auth-submit" class="w-full bg-primary text-white rounded-xl py-3.5 text-title-sm font-bold active:scale-95 transition-transform">${isSignup ? 'הרשמה' : 'כניסה'}</button>
+        <button onclick="submitAuth()" id="auth-submit" ${state.authBusy ? 'disabled' : ''} class="w-full bg-primary text-white rounded-xl py-3.5 text-title-sm font-bold active:scale-95 transition-transform disabled:opacity-60">${state.authBusy ? 'רק רגע…' : isSignup ? 'הרשמה' : 'כניסה'}</button>
       </div>
     </div>
   `;
@@ -1558,32 +1634,59 @@ function renderHouseholdSetup() {
 }
 
 async function submitAuth() {
-  const email = document.getElementById('auth-email')?.value.trim();
-  const password = document.getElementById('auth-password')?.value;
-  const nameEl = document.getElementById('auth-name');
-  if (!email || !password) { showToast('נא למלא אימייל וסיסמה', 'error'); return; }
-  const btn = document.getElementById('auth-submit');
-  if (btn) btn.disabled = true;
+  if (state.authBusy) return;
+  const isSignup = state.authTab === 'signup';
+  const f = state.authForm;
+  const email = f.email.trim().toLowerCase();
+  const password = f.password.trim();
+  const name = f.name.trim();
+  f.email = email;
+
+  if (!email || !password) { setAuthMessage('error', 'נא למלא אימייל וסיסמה.'); return; }
+  if (isSignup && password.length < 6) { setAuthMessage('error', 'הסיסמה חייבת להכיל לפחות 6 תווים.'); return; }
+
+  state.authBusy = true;
+  setAuthMessage(null);
 
   let result;
-  if (state.authTab === 'signup') {
-    result = await sb.auth.signUp({ email, password, options: { data: { display_name: nameEl?.value.trim() || null } } });
-    if (!result.error && !result.data.session) {
-      showToast('נשלח אליך מייל לאימות החשבון', 'mail');
-      if (btn) btn.disabled = false;
-      return;
-    }
-  } else {
-    result = await sb.auth.signInWithPassword({ email, password });
+  try {
+    result = isSignup
+      ? await sb.auth.signUp({ email, password, options: { data: { display_name: name || null } } })
+      : await sb.auth.signInWithPassword({ email, password });
+  } catch (e) {
+    result = { data: {}, error: e };
   }
-  if (btn) btn.disabled = false;
+  state.authBusy = false;
+
   if (result.error) {
-    console.error(result.error);
-    showToast(result.error.message.includes('Invalid login') ? 'אימייל או סיסמה שגויים' : 'שגיאה: ' + result.error.message, 'error');
+    console.error(`[auth] ${isSignup ? 'signUp' : 'signInWithPassword'} failed:`, result.error);
+    setAuthMessage('error', authErrorToHebrew(result.error));
     return;
   }
-  sb.from('users').update({ last_login_at: new Date().toISOString() }).eq('id', result.data.user.id).then(() => {});
-  // The rest happens in onAuthStateChange
+
+  const { user, session } = result.data;
+
+  if (isSignup && !session) {
+    // With email confirmation on, Supabase returns a user with no identities when the email is already registered
+    if (user && Array.isArray(user.identities) && user.identities.length === 0) {
+      setAuthMessage('error', 'משתמש עם כתובת אימייל זו כבר רשום במערכת.');
+      return;
+    }
+    // Email confirmation required: switch to the login tab with the email already filled in
+    state.authTab = 'login';
+    f.password = '';
+    setAuthMessage('success', 'החשבון נוצר! יש להיכנס למייל ולאשר את ההרשמה לפני ההתחברות.');
+    return;
+  }
+
+  // Logged in (or signed up without confirmation): load the data and update the screen right away
+  state.authForm = { name: '', email: '', password: '' };
+  state.authMessage = null;
+  sb.from('users').update({ last_login_at: new Date().toISOString() }).eq('id', user.id).then(({ error }) => {
+    if (error) console.error('[auth] last_login_at update failed:', error);
+  });
+  await afterLogin();
+  showToast(isSignup ? 'נרשמת בהצלחה!' : 'התחברת בהצלחה!', 'check_circle');
 }
 
 async function createHousehold() {
@@ -1621,7 +1724,14 @@ async function saveSetting(key, value) {
   await dbRun(sb.from('user_settings').update({ [key]: value }).eq('user_id', state.currentUser.id));
 }
 
-async function afterLogin() {
+// If afterLogin is already running (e.g. submitAuth + the SIGNED_IN event together), return the same run
+let afterLoginRun = null;
+function afterLogin() {
+  if (!afterLoginRun) afterLoginRun = doAfterLogin().finally(() => { afterLoginRun = null; });
+  return afterLoginRun;
+}
+
+async function doAfterLogin() {
   await loadSession();
   subscribeRealtime();
   refreshUI();
@@ -1640,7 +1750,9 @@ async function logout() {
 }
 
 function showAuthTab(tab) {
+  if (state.authTab === tab) return;
   state.authTab = tab;
+  state.authMessage = null; // values typed into the fields are kept in state.authForm
   renderProfileModal();
 }
 
@@ -1661,11 +1773,17 @@ async function init() {
   await loadSession();
   document.documentElement.classList.toggle('dark', !!state.settings.dark_mode);
   subscribeRealtime();
-  refreshUI();
-  if (!state.currentUser.isLoggedIn || !state.household) openModal('profile');
+  refreshUI(); // includes enforceAccessGate, which opens the login window if needed
 
-  sb.auth.onAuthStateChange((event) => {
-    if (event === 'SIGNED_IN') setTimeout(afterLogin, 0);
+  // Keeps the screen in sync with the session: login from another tab, return from the confirmation link, logout.
+  // Skips SIGNED_IN for a user who is already loaded (Supabase sends it again on token refresh / window focus)
+  sb.auth.onAuthStateChange((event, session) => {
+    if (event === 'SIGNED_IN') {
+      setTimeout(() => {
+        if (state.currentUser.isLoggedIn && state.currentUser.id === session?.user?.id) return;
+        afterLogin();
+      }, 0);
+    }
     if (event === 'SIGNED_OUT') {
       setTimeout(async () => {
         await loadSession();
